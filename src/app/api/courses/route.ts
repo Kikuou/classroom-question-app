@@ -31,10 +31,20 @@ export async function POST(req: Request) {
       .values({ name, code: code.toUpperCase(), password: hashed })
       .returning();
     return NextResponse.json(course, { status: 201 });
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // PostgreSQL UNIQUE 制約違反 (error code 23505)
+    if (msg.includes("23505") || msg.includes("unique")) {
+      return NextResponse.json(
+        { error: "授業コードが既に使用されています" },
+        { status: 409 }
+      );
+    }
+    // テーブル未作成・DB接続失敗などはそのままメッセージを返す
+    console.error("[POST /api/courses]", msg);
     return NextResponse.json(
-      { error: "授業コードが既に使用されています" },
-      { status: 409 }
+      { error: `DBエラー: ${msg}` },
+      { status: 500 }
     );
   }
 }
