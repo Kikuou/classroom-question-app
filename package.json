@@ -1,0 +1,36 @@
+{
+  "name": "question-aggregator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "next": "14.2.29",
+    "react": "^18",
+    "react-dom": "^18",
+    "drizzle-orm": "^0.30.10",
+    "@neondatabase/serverless": "^0.9.4",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/bcryptjs": "^2.4.6",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.29",
+    "drizzle-kit": "^0.21.4"
+  }
+}
