@@ -8,11 +8,21 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+// 教員アカウント（新規）
+export const teachers = pgTable("teachers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const courses = pgTable("courses", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   password: text("password").notNull(),
+  teacherId: integer("teacher_id").references(() => teachers.id),
+  isVisible: boolean("is_visible").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -23,6 +33,8 @@ export const sessions = pgTable("sessions", {
     .references(() => courses.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   isOpen: boolean("is_open").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -35,6 +47,8 @@ export const questions = pgTable("questions", {
   authorName: text("author_name"),
   clientId: text("client_id").notNull(),
   status: text("status").default("pending").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -65,6 +79,7 @@ export const likes = pgTable(
   })
 );
 
+export type Teacher = typeof teachers.$inferSelect;
 export type Course = typeof courses.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Question = typeof questions.$inferSelect;

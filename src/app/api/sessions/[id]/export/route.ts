@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { questions, replies, likes } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireTeacher } from "@/lib/auth";
 
 export async function GET(
@@ -29,7 +29,7 @@ export async function GET(
     })
     .from(questions)
     .leftJoin(likes, eq(likes.questionId, questions.id))
-    .where(eq(questions.sessionId, sessionId))
+    .where(and(eq(questions.sessionId, sessionId), eq(questions.isDeleted, false)))
     .groupBy(questions.id)
     .orderBy(
       sort === "likes"
@@ -43,9 +43,7 @@ export async function GET(
       ? await db
           .select()
           .from(replies)
-          .where(
-            sql`${replies.questionId} = any(array[${sql.raw(questionIds.join(","))}])`
-          )
+          .where(inArray(replies.questionId, questionIds))
           .orderBy(replies.createdAt)
       : [];
 
@@ -64,7 +62,7 @@ export async function GET(
 
   const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
-  const header = ["質問", "投稿時刻", "ステータス", "いいね数", "返信"].join(",");
+  const header = ["質問", "投稿時刻", "投稿者", "ステータス", "いいね数", "返信"].join(",");
   const body = rows
     .map((q) => {
       const dt = new Date(q.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
@@ -72,6 +70,7 @@ export async function GET(
       return [
         escape(q.content),
         escape(dt),
+        escape(q.authorName ?? "匿名"),
         escape(statusLabels[q.status] ?? q.status),
         q.likeCount.toString(),
         escape(replyText),
@@ -79,7 +78,7 @@ export async function GET(
     })
     .join("\n");
 
-  const csv = "\uFEFF" + header + "\n" + body; // BOM付きでExcel対応
+  const csv = "\uFEFF" + header + "\n" + body;
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

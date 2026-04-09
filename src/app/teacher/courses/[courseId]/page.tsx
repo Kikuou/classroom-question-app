@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 interface SessionItem {
   id: number;
   title: string;
   isOpen: boolean;
+  sortOrder: number;
   createdAt: string;
 }
 
@@ -14,140 +15,201 @@ interface CourseInfo {
   id: number;
   name: string;
   code: string;
+  isVisible: boolean;
 }
 
-export default function CourseDetailPage() {
+export default function TeacherCoursePage() {
   const { courseId } = useParams<{ courseId: string }>();
   const router = useRouter();
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unauth, setUnauth] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const dragItem = useRef<number | null>(null);
+  const dragOver = useRef<number | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/courses/${courseId}`)
-      .then((r) => {
-        if (r.status === 401) { setUnauth(true); return null; }
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((data) => {
-        if (data) {
-          setCourse(data.course);
-          setSessions(data.sessions);
-        }
-        setLoading(false);
-      });
-  }, [courseId]);
-
-  const handleLogout = async () => {
-    await fetch("/api/teacher/logout", { method: "POST" });
-    router.push("/teacher/login");
-  };
-
-  const toggleSession = async (sessionId: number, isOpen: boolean) => {
-    const res = await fetch(`/api/sessions/${sessionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isOpen: !isOpen }),
-    });
+  const fetchData = async () => {
+    const res = await fetch(`/api/courses/${courseId}`);
+    if (res.status === 401) { router.replace("/teacher/login"); return; }
     if (res.ok) {
-      const updated = await res.json();
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, isOpen: updated.isOpen } : s))
-      );
+      const data = await res.json();
+      setCourse(data.course);
+      setSessions(data.sessions);
     }
   };
 
-  if (unauth) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 mb-2">ログインが必要です</p>
-          <a href="/teacher/login" className="text-blue-500 underline">ログインページへ</a>
-        </div>
-      </main>
-    );
-  }
+  useEffect(() => { fetchData(); }, [courseId]);
 
-  if (loading) {
-    return <main className="min-h-screen flex items-center justify-center"><p className="text-gray-400">読み込み中...</p></main>;
-  }
+  const createSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim(), courseId: parseInt(courseId) }),
+      });
+      if (res.ok) {
+        setNewTitle("");
+        setShowForm(false);
+        await fetchData();
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteSession = async (sessionId: number) => {
+    if (!confirm("このセッションを削除しますか？\n（質問データは保持されます）")) return;
+    const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    if (res.ok) setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+  };
+
+  // ドラッグ&ドロップ
+  const handleDragStart = (index: number) => { dragItem.current = index; };
+  const handleDragEnter = (index: number) => { dragOver.current = index; };
+  const handleDragEnd = async () => {
+    if (dragItem.current === null || dragOver.current === null) return;
+    if (dragItem.current === dragOver.current) return;
+
+    const updated = [...sessions];
+    const [moved] = updated.splice(dragItem.current, 1);
+    updated.splice(dragOver.current, 0, moved);
+    const reordered = updated.map((s, i) => ({ ...s, sortOrder: i }));
+    setSessions(reordered);
+    dragItem.current = null;
+    dragOver.current = null;
+
+    await fetch("/api/sessions/sort", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: reordered.map((s) => s.id) }),
+    });
+  };
+
+  const toggleVisible = async () => {
+    if (!course) return;
+    const res = await fetch(`/api/courses/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isVisible: !course.isVisible }),
+    });
+    if (res.ok) setCourse((c) => c ? { ...c, isVisible: !c.isVisible } : c);
+  };
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400">教員管理</p>
-            <h1 className="font-bold text-gray-800">{course?.name}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono">
-              {course?.code}
-            </span>
+      <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <button
+                onClick={() => router.push("/teacher/dashboard")}
+                className="text-xs text-gray-400 hover:text-gray-600 mb-0.5 block"
+              >
+                ← ダッシュボード
+              </button>
+              <h1 className="font-bold text-gray-800 text-sm">{course?.name ?? "読み込み中..."}</h1>
+              <p className="text-xs text-gray-400 font-mono">{course?.code}</p>
+            </div>
             <button
-              onClick={handleLogout}
-              className="text-xs text-gray-400 hover:text-gray-600 underline"
+              onClick={toggleVisible}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                course?.isVisible
+                  ? "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
+                  : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
+              }`}
             >
-              ログアウト
+              {course?.isVisible ? "公開中" : "非公開"}
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-700">授業回一覧</h2>
-          <a
-            href={`/teacher/courses/${courseId}/sessions/new`}
-            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors"
+          <h2 className="text-sm font-semibold text-gray-600">セッション一覧</h2>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            + 授業回を追加
-          </a>
+            + 新規セッション
+          </button>
         </div>
+
+        {showForm && (
+          <form onSubmit={createSession} className="bg-white rounded-xl border p-3 flex gap-2">
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="セッションタイトル（例: 第1回 有機化学入門）"
+              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              autoFocus
+              maxLength={100}
+            />
+            <button
+              type="submit"
+              disabled={creating || !newTitle.trim()}
+              className="text-xs px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {creating ? "作成中" : "作成"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              閉じる
+            </button>
+          </form>
+        )}
 
         {sessions.length === 0 ? (
           <div className="text-center text-gray-400 py-12 text-sm">
-            授業回がありません。追加してください。
+            セッションがありません
           </div>
         ) : (
-          <div className="space-y-2">
-            {[...sessions].reverse().map((s) => (
-              <div
-                key={s.id}
-                className="bg-white rounded-2xl shadow-sm border p-4 flex items-center justify-between gap-3"
-              >
+          <p className="text-xs text-gray-400">ドラッグ&ドロップで並び替えできます</p>
+        )}
+
+        <ul className="space-y-2">
+          {sessions.map((s, index) => (
+            <li
+              key={s.id}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragEnter={() => handleDragEnter(index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => e.preventDefault()}
+              className="bg-white rounded-xl border shadow-sm p-3 flex items-center gap-3 cursor-grab active:cursor-grabbing select-none"
+            >
+              <span className="text-gray-300 text-lg">⠿</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{s.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {s.isOpen ? "受付中" : "締切済"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => router.push(`/teacher/sessions/${s.id}`)}
-                  className="flex-1 text-left"
+                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                 >
-                  <p className="font-medium text-gray-800 text-sm">{s.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(s.createdAt).toLocaleDateString("ja-JP")}
-                  </p>
+                  管理
                 </button>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      s.isOpen
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {s.isOpen ? "受付中" : "締切"}
-                  </span>
-                  <button
-                    onClick={() => toggleSession(s.id, s.isOpen)}
-                    className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
-                  >
-                    {s.isOpen ? "締め切る" : "再開"}
-                  </button>
-                </div>
+                <button
+                  onClick={() => deleteSession(s.id)}
+                  className="text-xs text-red-400 hover:text-red-600 px-1"
+                >
+                  削除
+                </button>
               </div>
-            ))}
-          </div>
-        )}
+            </li>
+          ))}
+        </ul>
       </div>
     </main>
   );

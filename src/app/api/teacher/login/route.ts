@@ -1,28 +1,28 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { courses } from "@/db/schema";
+import { teachers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { createTeacherToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  const { code, password } = await req.json();
-  if (!code || !password) {
+  const { name, password } = await req.json();
+  if (!name?.trim() || !password) {
     return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
   }
-  const [course] = await db
+  const [teacher] = await db
     .select()
-    .from(courses)
-    .where(eq(courses.code, code.toUpperCase()));
-  if (!course) {
-    return NextResponse.json({ error: "授業コードまたはパスワードが違います" }, { status: 401 });
+    .from(teachers)
+    .where(eq(teachers.name, name.trim()));
+  if (!teacher) {
+    return NextResponse.json({ error: "名前またはパスワードが違います" }, { status: 401 });
   }
-  const ok = await bcrypt.compare(password, course.password);
+  const ok = await bcrypt.compare(password, teacher.password);
   if (!ok) {
-    return NextResponse.json({ error: "授業コードまたはパスワードが違います" }, { status: 401 });
+    return NextResponse.json({ error: "名前またはパスワードが違います" }, { status: 401 });
   }
-  const token = await createTeacherToken(course.id);
-  const res = NextResponse.json({ courseId: course.id, courseName: course.name });
+  const token = await createTeacherToken(teacher.id);
+  const res = NextResponse.json({ teacherId: teacher.id, name: teacher.name });
   res.cookies.set("teacher_token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

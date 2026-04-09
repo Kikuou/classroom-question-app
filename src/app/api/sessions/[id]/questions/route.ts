@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { questions, replies, likes, sessions } from "@/db/schema";
 import { eq, sql, and, ne, inArray } from "drizzle-orm";
-import { getTeacherCourseId } from "@/lib/auth";
+import { getTeacherId } from "@/lib/auth";
 
 // 質問一覧（いいね数・返信含む）
 export async function GET(
@@ -16,8 +16,7 @@ export async function GET(
   const sort = url.searchParams.get("sort") ?? "time";
   const clientId = url.searchParams.get("clientId") ?? "";
 
-  // 教員は全件、学生はhidden以外
-  const isTeacher = !!(await getTeacherCourseId());
+  const isTeacher = !!(await getTeacherId());
   const showAll = all && isTeacher;
 
   const rows = await db
@@ -26,6 +25,7 @@ export async function GET(
       content: questions.content,
       authorName: questions.authorName,
       status: questions.status,
+      sortOrder: questions.sortOrder,
       createdAt: questions.createdAt,
       likeCount: sql<number>`cast(count(distinct ${likes.id}) as int)`,
     })
@@ -33,13 +33,19 @@ export async function GET(
     .leftJoin(likes, eq(likes.questionId, questions.id))
     .where(
       showAll
-        ? eq(questions.sessionId, sessionId)
-        : and(eq(questions.sessionId, sessionId), ne(questions.status, "hidden"))
+        ? and(eq(questions.sessionId, sessionId), eq(questions.isDeleted, false))
+        : and(
+            eq(questions.sessionId, sessionId),
+            eq(questions.isDeleted, false),
+            ne(questions.status, "hidden")
+          )
     )
     .groupBy(questions.id)
     .orderBy(
       sort === "likes"
         ? sql`count(distinct ${likes.id}) desc, ${questions.createdAt} asc`
+        : sort === "manual"
+        ? sql`${questions.sortOrder} asc, ${questions.createdAt} asc`
         : sql`${questions.createdAt} asc`
     );
 
@@ -47,7 +53,6 @@ export async function GET(
 
   const questionIds = rows.map((r) => r.id);
 
-  // 返信を一括取得（inArray で安全に）
   const replyRows = await db
     .select()
     .from(replies)
@@ -59,7 +64,6 @@ export async function GET(
     return acc;
   }, {});
 
-  // このクライアントがいいねした質問IDセットを一括取得
   const clientLikedSet = new Set<number>();
   if (clientId) {
     const clientLikes = await db
@@ -86,11 +90,10 @@ export async function POST(
   const { id } = await params;
   const sessionId = parseInt(id);
 
-  // セッションが開いているか確認
   const [session] = await db
     .select()
     .from(sessions)
-    .where(eq(sessions.id, sessionId));
+    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
   if (!session) {
     return NextResponse.json({ error: "セッションが見つかりません" }, { status: 404 });
   }

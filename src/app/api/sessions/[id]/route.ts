@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, courses } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireTeacher } from "@/lib/auth";
 
-// セッション詳細（学生も使用：入室コード確認）
+// セッション詳細（学生も使用）
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -23,29 +23,73 @@ export async function GET(
     })
     .from(sessions)
     .innerJoin(courses, eq(sessions.courseId, courses.id))
-    .where(eq(sessions.id, sessionId));
+    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   return NextResponse.json(session);
 }
 
-// セッションの公開/締切切替
+// セッション更新（公開/締切、タイトル変更）
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const sessionId = parseInt(id);
+  let teacherId: number;
   try {
-    await requireTeacher();
+    teacherId = await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { isOpen } = await req.json();
+  // 自分の授業のセッションか確認
+  const [existing] = await db
+    .select({ id: sessions.id, courseId: sessions.courseId })
+    .from(sessions)
+    .innerJoin(courses, eq(sessions.courseId, courses.id))
+    .where(and(eq(sessions.id, sessionId), eq(courses.teacherId, teacherId)));
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const body = await req.json();
+  const updateData: Partial<{ isOpen: boolean; title: string }> = {};
+  if (typeof body.isOpen === "boolean") updateData.isOpen = body.isOpen;
+  if (typeof body.title === "string" && body.title.trim()) updateData.title = body.title.trim();
+
   const [session] = await db
     .update(sessions)
-    .set({ isOpen })
-    .where(eq(sessions.id, parseInt(id)))
+    .set(updateData)
+    .where(eq(sessions.id, sessionId))
     .returning();
   return NextResponse.json(session);
+}
+
+// セッション論理削除
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sessionId = parseInt(id);
+  let teacherId: number;
+  try {
+    teacherId = await requireTeacher();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const [existing] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .innerJoin(courses, eq(sessions.courseId, courses.id))
+    .where(and(eq(sessions.id, sessionId), eq(courses.teacherId, teacherId)));
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  await db
+    .update(sessions)
+    .set({ isDeleted: true })
+    .where(eq(sessions.id, sessionId));
+  return NextResponse.json({ ok: true });
 }

@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+interface CourseItem {
+  id: number;
+  name: string;
+  code: string;
+  isVisible: boolean;
+  pendingCount: number;
+}
+
+export default function TeacherDashboardPage() {
+  const router = useRouter();
+  const [courses, setCourses] = useState<CourseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCourses = async () => {
+    const res = await fetch("/api/courses");
+    if (res.status === 401) {
+      router.replace("/teacher/login");
+      return;
+    }
+    if (res.ok) setCourses(await res.json());
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchCourses(); }, []);
+
+  const logout = async () => {
+    await fetch("/api/teacher/logout", { method: "POST" });
+    router.push("/teacher/login");
+  };
+
+  const toggleVisible = async (courseId: number, current: boolean) => {
+    const res = await fetch(`/api/courses/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isVisible: !current }),
+    });
+    if (res.ok) {
+      setCourses((prev) =>
+        prev.map((c) => (c.id === courseId ? { ...c, isVisible: !current } : c))
+      );
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <h1 className="font-bold text-gray-800 text-base">マイ授業一覧</h1>
+          <div className="flex items-center gap-3">
+            <a
+              href="/teacher/courses/new"
+              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + 新規授業
+            </a>
+            <button
+              onClick={logout}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              ログアウト
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto px-4 py-4">
+        {loading ? (
+          <div className="text-center text-gray-400 py-12 text-sm">読み込み中...</div>
+        ) : courses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-sm mb-4">まだ授業がありません</p>
+            <a
+              href="/teacher/courses/new"
+              className="inline-block px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+            >
+              最初の授業を作成
+            </a>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {courses.map((c) => (
+              <li key={c.id}>
+                <div className="bg-white rounded-2xl border shadow-sm p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      onClick={() => router.push(`/teacher/courses/${c.id}`)}
+                      className="flex-1 text-left"
+                    >
+                      <p className="font-semibold text-gray-800">{c.name}</p>
+                      <p className="text-xs text-gray-400 font-mono mt-0.5">{c.code}</p>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {c.pendingCount > 0 && (
+                        <span className="text-xs bg-yellow-100 text-yellow-700 font-medium px-2 py-0.5 rounded-full">
+                          未対応 {c.pendingCount}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => toggleVisible(c.id, c.isVisible)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          c.isVisible
+                            ? "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
+                            : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
+                        }`}
+                      >
+                        {c.isVisible ? "公開中" : "非公開"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => router.push(`/teacher/courses/${c.id}`)}
+                      className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    >
+                      セッション管理
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </main>
+  );
+}

@@ -17,6 +17,7 @@ interface Question {
   authorName: string | null;
   status: string;
   likeCount: number;
+  sortOrder: number;
   createdAt: string;
   replies: Reply[];
 }
@@ -36,11 +37,13 @@ export default function TeacherSessionPage() {
   const router = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [sort, setSort] = useState<"time" | "likes">("time");
+  const [sort, setSort] = useState<"time" | "likes" | "manual">("time");
   const [replyInputs, setReplyInputs] = useState<Record<number, string>>({});
   const [submittingReply, setSubmittingReply] = useState<number | null>(null);
   const [exportSort, setExportSort] = useState<"time" | "likes">("likes");
   const abortRef = useRef<AbortController | null>(null);
+  const dragItem = useRef<number | null>(null);
+  const dragOver = useRef<number | null>(null);
 
   const fetchQuestions = useCallback(async () => {
     abortRef.current?.abort();
@@ -107,6 +110,34 @@ export default function TeacherSessionPage() {
     }
   };
 
+  const deleteQuestion = async (questionId: number) => {
+    if (!confirm("この質問を削除しますか？（データは保持されます）")) return;
+    const res = await fetch(`/api/questions/${questionId}`, { method: "DELETE" });
+    if (res.ok) setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+  };
+
+  // ドラッグ&ドロップ（manualモード時）
+  const handleDragStart = (index: number) => { dragItem.current = index; };
+  const handleDragEnter = (index: number) => { dragOver.current = index; };
+  const handleDragEnd = async () => {
+    if (dragItem.current === null || dragOver.current === null) return;
+    if (dragItem.current === dragOver.current) return;
+
+    const updated = [...questions];
+    const [moved] = updated.splice(dragItem.current, 1);
+    updated.splice(dragOver.current, 0, moved);
+    const reordered = updated.map((q, i) => ({ ...q, sortOrder: i }));
+    setQuestions(reordered);
+    dragItem.current = null;
+    dragOver.current = null;
+
+    await fetch("/api/questions/sort", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: reordered.map((q) => q.id) }),
+    });
+  };
+
   const counts = {
     total: questions.length,
     pending: questions.filter((q) => q.status === "pending").length,
@@ -155,7 +186,7 @@ export default function TeacherSessionPage() {
         {/* ツールバー */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex gap-1">
-            {(["time", "likes"] as const).map((s) => (
+            {(["time", "likes", "manual"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
@@ -165,7 +196,7 @@ export default function TeacherSessionPage() {
                     : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                 }`}
               >
-                {s === "time" ? "新着順" : "いいね順"}
+                {s === "time" ? "新着順" : s === "likes" ? "いいね順" : "手動並替"}
               </button>
             ))}
           </div>
@@ -187,17 +218,26 @@ export default function TeacherSessionPage() {
           </div>
         </div>
 
+        {sort === "manual" && questions.length > 0 && (
+          <p className="text-xs text-gray-400">ドラッグ&ドロップで並び替えできます</p>
+        )}
+
         {questions.length === 0 ? (
           <div className="text-center text-gray-400 py-12 text-sm">質問がありません</div>
         ) : (
-          questions.map((q) => (
+          questions.map((q, index) => (
             <TeacherQuestionCard
               key={q.id}
               question={q}
               replyInput={replyInputs[q.id] ?? ""}
               onReplyChange={(v) => setReplyInputs((prev) => ({ ...prev, [q.id]: v }))}
               onReplySubmit={() => submitReply(q.id)}
+              onDelete={() => deleteQuestion(q.id)}
               submitting={submittingReply === q.id}
+              draggable={sort === "manual"}
+              onDragStart={() => handleDragStart(index)}
+              onDragEnter={() => handleDragEnter(index)}
+              onDragEnd={handleDragEnd}
             />
           ))
         )}
@@ -211,15 +251,24 @@ function TeacherQuestionCard({
   replyInput,
   onReplyChange,
   onReplySubmit,
+  onDelete,
   submitting,
+  draggable,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
 }: {
   question: Question;
   replyInput: string;
   onReplyChange: (v: string) => void;
   onReplySubmit: () => void;
+  onDelete: () => void;
   submitting: boolean;
+  draggable: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDragEnd: () => void;
 }) {
-  // ポーリングで question.status が変わったら同期する
   const [status, setStatus] = useState(question.status);
   useEffect(() => {
     setStatus(question.status);
@@ -237,12 +286,18 @@ function TeacherQuestionCard({
 
   return (
     <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnter={onDragEnter}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => e.preventDefault()}
       className={`bg-white rounded-2xl shadow-sm border p-4 space-y-3 transition-opacity ${
         status === "hidden" ? "opacity-40" : ""
-      }`}
+      } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       {/* 質問本文 + いいね・ステータス */}
       <div className="flex items-start gap-2">
+        {draggable && <span className="text-gray-300 text-lg mt-0.5 shrink-0">⠿</span>}
         <p className="text-sm text-gray-800 leading-relaxed flex-1">{question.content}</p>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <span className="text-sm text-gray-500 font-medium">♥ {question.likeCount}</span>
@@ -258,7 +313,7 @@ function TeacherQuestionCard({
         {question.authorName ?? "匿名"} · {dt}
       </div>
 
-      {/* ステータス切替（ワンクリック） */}
+      {/* ステータス切替 */}
       <StatusSelector
         questionId={question.id}
         currentStatus={status}
@@ -277,10 +332,10 @@ function TeacherQuestionCard({
         </div>
       )}
 
-      {/* 返信入力 */}
-      <div className="border-t pt-2">
+      {/* 返信入力 + 削除ボタン */}
+      <div className="border-t pt-2 flex items-center gap-2">
         {showReply ? (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-1">
             <input
               type="text"
               value={replyInput}
@@ -307,11 +362,17 @@ function TeacherQuestionCard({
         ) : (
           <button
             onClick={() => setShowReply(true)}
-            className="text-xs text-blue-500 hover:text-blue-700"
+            className="text-xs text-blue-500 hover:text-blue-700 flex-1"
           >
             {hasReply ? "+ 追加返信" : "+ 返信する"}
           </button>
         )}
+        <button
+          onClick={onDelete}
+          className="text-xs text-red-400 hover:text-red-600 ml-auto"
+        >
+          削除
+        </button>
       </div>
     </div>
   );
