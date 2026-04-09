@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: classroom-question-app
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # Renderダッシュボードで手動設定
+      - key: TEACHER_SECRET
+        sync: false   # Renderダッシュボードで手動設定
+      - key: NODE_ENV
+        value: production
