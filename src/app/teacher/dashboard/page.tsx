@@ -146,7 +146,6 @@ export default function TeacherDashboardPage() {
                       className="flex-1 text-left"
                     >
                       <p className="font-semibold text-gray-800">{c.name}</p>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">{c.code}</p>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       {c.pendingCount > 0 && (
