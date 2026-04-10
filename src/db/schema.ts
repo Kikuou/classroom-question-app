@@ -29,6 +29,7 @@ export const sessions = pgTable("sessions", {
     .references(() => courses.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   isOpen: boolean("is_open").default(true).notNull(),
+  discussionOpen: boolean("discussion_open").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
   promptDescription: text("prompt_description"),

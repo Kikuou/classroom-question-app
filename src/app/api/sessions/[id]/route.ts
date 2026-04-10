@@ -17,6 +17,7 @@ export async function GET(
         id: sessions.id,
         title: sessions.title,
         isOpen: sessions.isOpen,
+        discussionOpen: sessions.discussionOpen,
         courseId: sessions.courseId,
         courseName: courses.name,
         courseCode: courses.code,
@@ -35,7 +36,7 @@ export async function GET(
   }
 }
 
-// セッション更新（公開/締切、タイトル変更）
+// セッション更新（質問受付 / ディスカッション受付 / タイトル / 全体説明）
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -47,8 +48,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json();
-  const updateData: Partial<{ isOpen: boolean; title: string; promptDescription: string | null }> = {};
+  const updateData: Partial<{
+    isOpen: boolean;
+    discussionOpen: boolean;
+    title: string;
+    promptDescription: string | null;
+  }> = {};
+
   if (typeof body.isOpen === "boolean") updateData.isOpen = body.isOpen;
+  if (typeof body.discussionOpen === "boolean") updateData.discussionOpen = body.discussionOpen;
   if (typeof body.title === "string" && body.title.trim()) updateData.title = body.title.trim();
   if ("promptDescription" in body) {
     updateData.promptDescription =

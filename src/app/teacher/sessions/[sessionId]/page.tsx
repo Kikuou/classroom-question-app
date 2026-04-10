@@ -42,6 +42,7 @@ interface SessionInfo {
   id: number;
   title: string;
   isOpen: boolean;
+  discussionOpen: boolean;
   courseName: string;
   courseId: number;
   promptDescription: string | null;
@@ -157,7 +158,8 @@ export default function TeacherSessionPage() {
     }
   }, [tab, fetchQuestions, fetchPrompts]);
 
-  const toggleOpen = async () => {
+  // 質問受付の切替
+  const toggleQuestionsOpen = async () => {
     if (!session) return;
     const res = await fetch(`/api/sessions/${sessionId}`, {
       method: "PATCH",
@@ -167,6 +169,20 @@ export default function TeacherSessionPage() {
     if (res.ok) {
       const updated = await res.json();
       setSession((s) => s ? { ...s, isOpen: updated.isOpen } : s);
+    }
+  };
+
+  // ディスカッション回答受付の切替
+  const toggleDiscussionOpen = async () => {
+    if (!session) return;
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ discussionOpen: !session.discussionOpen }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setSession((s) => s ? { ...s, discussionOpen: updated.discussionOpen } : s);
     }
   };
 
@@ -431,16 +447,30 @@ export default function TeacherSessionPage() {
                 {sessionLoading ? "読み込み中..." : sessionError ? "エラー" : (session?.title ?? "")}
               </h1>
             </div>
-            <button
-              onClick={toggleOpen}
-              className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
-                session?.isOpen
-                  ? "border-red-200 text-red-600 bg-red-50 hover:bg-red-100"
-                  : "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
-              }`}
-            >
-              {session?.isOpen ? "締め切る" : "再開する"}
-            </button>
+            <div className="flex flex-col gap-1 items-end shrink-0">
+              <button
+                onClick={toggleQuestionsOpen}
+                disabled={!session}
+                className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors disabled:opacity-40 ${
+                  session?.isOpen
+                    ? "border-red-200 text-red-600 bg-red-50 hover:bg-red-100"
+                    : "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
+                }`}
+              >
+                {session?.isOpen ? "質問受付中 →締切" : "質問締切中 →再開"}
+              </button>
+              <button
+                onClick={toggleDiscussionOpen}
+                disabled={!session}
+                className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors disabled:opacity-40 ${
+                  session?.discussionOpen
+                    ? "border-orange-200 text-orange-600 bg-orange-50 hover:bg-orange-100"
+                    : "border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100"
+                }`}
+              >
+                {session?.discussionOpen ? "回答受付中 →締切" : "回答締切中 →再開"}
+              </button>
+            </div>
           </div>
 
           {/* タブ切替 */}

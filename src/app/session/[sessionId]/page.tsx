@@ -44,6 +44,7 @@ interface SessionInfo {
   id: number;
   title: string;
   isOpen: boolean;
+  discussionOpen: boolean;
   courseName: string;
   courseId: number;
   promptDescription: string | null;
@@ -330,19 +331,30 @@ export default function SessionPage() {
             ← {session?.courseName ?? "授業一覧"}に戻る
           </button>
 
-          <div className="flex items-center justify-between">
-            <h1 className="font-bold text-gray-800 text-sm leading-tight flex-1 mr-2">
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="font-bold text-gray-800 text-sm leading-tight flex-1">
               {session?.title ?? "読み込み中..."}
             </h1>
-            <span
-              className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${
-                session?.isOpen
-                  ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {session?.isOpen ? "受付中" : "締切"}
-            </span>
+            <div className="flex flex-col gap-1 items-end shrink-0">
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  session?.isOpen
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                質問 {session?.isOpen ? "受付中" : "締切済"}
+              </span>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  session?.discussionOpen
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                回答 {session?.discussionOpen ? "受付中" : "締切済"}
+              </span>
+            </div>
           </div>
 
           {/* タブ切替 */}
@@ -374,8 +386,8 @@ export default function SessionPage() {
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
         {tab === "questions" ? (
           <>
-            {/* 質問投稿フォーム */}
-            {session?.isOpen && (
+            {/* 質問投稿フォーム or 締切メッセージ */}
+            {session?.isOpen ? (
               <div className="bg-white rounded-2xl shadow-sm border p-4">
                 <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
@@ -418,7 +430,12 @@ export default function SessionPage() {
                   </button>
                 </form>
               </div>
-            )}
+            ) : session !== null ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-500 text-center">
+                この回の質問受付は終了しました。<br />
+                <span className="text-xs text-gray-400">投稿済みの質問と教員の返信は引き続き閲覧できます。</span>
+              </div>
+            ) : null}
 
             {/* ソート切替 */}
             <div className="flex items-center justify-between">
@@ -487,30 +504,39 @@ export default function SessionPage() {
                   <p className="text-xs text-gray-400 font-medium">Q{qi + 1}</p>
                   <p className="text-sm text-gray-800 leading-relaxed font-medium">{p.content}</p>
 
-                  {/* 回答フォーム */}
-                  {session?.isOpen && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={answerInputs[p.id] ?? ""}
-                        onCompositionStart={() => { isComposingRef.current = true; }}
-                        onCompositionEnd={(e) => {
-                          isComposingRef.current = false;
-                          userEditedRef.current.add(p.id);
-                          setAnswerInputs((prev) => ({
-                            ...prev,
-                            [p.id]: (e.target as HTMLTextAreaElement).value,
-                          }));
-                        }}
-                        onChange={(e) => {
-                          userEditedRef.current.add(p.id);
-                          // 変換中でも表示は更新（React制御入力として正常動作させる）
-                          setAnswerInputs((prev) => ({ ...prev, [p.id]: e.target.value }));
-                        }}
-                        placeholder="あなたの回答を入力..."
-                        rows={3}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        maxLength={500}
-                      />
+                  {/* 回答フォーム（受付中のみ入力可） */}
+                  <div className="space-y-2">
+                    <textarea
+                      value={answerInputs[p.id] ?? ""}
+                      onCompositionStart={() => { isComposingRef.current = true; }}
+                      onCompositionEnd={(e) => {
+                        isComposingRef.current = false;
+                        userEditedRef.current.add(p.id);
+                        setAnswerInputs((prev) => ({
+                          ...prev,
+                          [p.id]: (e.target as HTMLTextAreaElement).value,
+                        }));
+                      }}
+                      onChange={(e) => {
+                        if (!session?.discussionOpen) return;
+                        userEditedRef.current.add(p.id);
+                        setAnswerInputs((prev) => ({ ...prev, [p.id]: e.target.value }));
+                      }}
+                      placeholder={
+                        session?.discussionOpen
+                          ? "あなたの回答を入力..."
+                          : "回答受付は終了しました"
+                      }
+                      rows={3}
+                      disabled={!session?.discussionOpen}
+                      className={`w-full border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none transition-colors ${
+                        session?.discussionOpen
+                          ? "border-gray-300 focus:ring-2 focus:ring-purple-400 bg-white"
+                          : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                      }`}
+                      maxLength={500}
+                    />
+                    {session?.discussionOpen ? (
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-gray-400">
                           {answerInputs[p.id]?.length ?? 0} / 500
@@ -535,8 +561,12 @@ export default function SessionPage() {
                           </button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center py-1">
+                        回答受付は終了しました。みんなの回答は引き続き閲覧できます。
+                      </p>
+                    )}
+                  </div>
 
                   {/* 結果表示 */}
                   {p.isResultsVisible ? (
