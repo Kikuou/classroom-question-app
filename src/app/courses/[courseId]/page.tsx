@@ -20,26 +20,33 @@ export default function CourseSessionsPage() {
   const router = useRouter();
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   useEffect(() => {
-    // 公開授業情報取得（/api/courses/public から名前を引く）
+    // 授業名を公開リストから取得
     fetch(`/api/courses/public?q=`)
       .then((r) => r.ok ? r.json() : [])
       .then((list: CourseInfo[]) => {
         const found = list.find((c) => c.id === parseInt(courseId));
         if (found) setCourse(found);
-      });
+      })
+      .catch(() => {});
 
-    // セッション一覧は /api/sessions/[id] の courseId フィルタが無いため
-    // 各セッションの courseId を確認する別APIが必要。
-    // ここでは簡易的に /api/courses/[id]/sessions を使う（学生向け公開エンドポイント）
+    // セッション一覧取得
     fetch(`/api/courses/${courseId}/sessions`)
-      .then((r) => {
-        if (!r.ok) { setNotFound(true); return null; }
+      .then(async (r) => {
+        if (r.status === 404) { setNotFound(true); return null; }
+        if (!r.ok) {
+          setServerError("セッション一覧の取得に失敗しました");
+          return null;
+        }
         return r.json();
       })
-      .then((data) => data && setSessions(data));
+      .then((data) => data && setSessions(data))
+      .catch(() => setServerError("通信エラーが発生しました"))
+      .finally(() => setLoading(false));
   }, [courseId]);
 
   if (notFound) {
@@ -48,6 +55,23 @@ export default function CourseSessionsPage() {
         <div className="text-center">
           <p className="text-gray-500">授業が見つかりません</p>
           <a href="/" className="text-blue-500 underline mt-2 block">トップに戻る</a>
+        </div>
+      </main>
+    );
+  }
+
+  if (serverError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-red-500">{serverError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 text-sm px-4 py-2 bg-gray-800 text-white rounded-xl"
+          >
+            再読み込み
+          </button>
+          <a href="/" className="text-blue-500 underline mt-3 block text-sm">トップに戻る</a>
         </div>
       </main>
     );
@@ -64,15 +88,18 @@ export default function CourseSessionsPage() {
             ←
           </button>
           <div>
-            <h1 className="font-bold text-gray-800 text-sm">{course?.name ?? "読み込み中..."}</h1>
-            <p className="text-xs text-gray-400 font-mono">{course?.code}</p>
+            <h1 className="font-bold text-gray-800 text-sm">
+              {loading ? "読み込み中..." : (course?.name ?? "授業")}
+            </h1>
           </div>
         </div>
       </header>
 
       <div className="max-w-xl mx-auto px-4 py-4">
         <h2 className="text-sm font-semibold text-gray-600 mb-3">セッション一覧</h2>
-        {sessions.length === 0 ? (
+        {loading ? (
+          <div className="text-center text-gray-400 py-12 text-sm">読み込み中...</div>
+        ) : sessions.length === 0 ? (
           <div className="text-center text-gray-400 py-12 text-sm">
             開催中のセッションがありません
           </div>

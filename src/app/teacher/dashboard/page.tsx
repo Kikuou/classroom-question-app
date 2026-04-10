@@ -15,15 +15,30 @@ export default function TeacherDashboardPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showPwForm, setShowPwForm] = useState(false);
   const [newPw, setNewPw] = useState("");
   const [pwMsg, setPwMsg] = useState("");
 
   const fetchCourses = async () => {
-    const res = await fetch("/api/courses");
-    if (res.status === 401) { router.replace("/teacher/login"); return; }
-    if (res.ok) setCourses(await res.json());
-    setLoading(false);
+    setError("");
+    try {
+      const res = await fetch("/api/courses");
+      if (res.status === 401) {
+        router.replace("/teacher/login");
+        return;
+      }
+      if (res.ok) {
+        setCourses(await res.json());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "授業一覧の取得に失敗しました");
+      }
+    } catch {
+      setError("通信エラーが発生しました。ページを再読み込みしてください。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchCourses(); }, []);
@@ -125,6 +140,16 @@ export default function TeacherDashboardPage() {
       <div className="max-w-2xl mx-auto px-4 py-4">
         {loading ? (
           <div className="text-center text-gray-400 py-12 text-sm">読み込み中...</div>
+        ) : error ? (
+          <div className="text-center py-12 space-y-3">
+            <p className="text-red-500 text-sm">{error}</p>
+            <button
+              onClick={fetchCourses}
+              className="text-xs px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+            >
+              再試行
+            </button>
+          </div>
         ) : courses.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-400 text-sm mb-4">まだ授業がありません</p>

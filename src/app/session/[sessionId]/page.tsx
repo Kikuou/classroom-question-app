@@ -52,6 +52,7 @@ export default function SessionPage() {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [tab, setTab] = useState<"questions" | "prompts">("questions");
   const [notFound, setNotFound] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   // === 質問タブ state ===
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -73,11 +74,17 @@ export default function SessionPage() {
   // === セッション情報取得 ===
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
-      .then((r) => {
-        if (!r.ok) { setNotFound(true); return null; }
+      .then(async (r) => {
+        if (r.status === 404) { setNotFound(true); return null; }
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          setServerError(data.error ?? "読み込みエラーが発生しました。しばらく待ってから再読み込みしてください。");
+          return null;
+        }
         return r.json();
       })
-      .then((data) => data && setSession(data));
+      .then((data) => data && setSession(data))
+      .catch(() => setServerError("通信エラーが発生しました"));
   }, [sessionId]);
 
   // === 質問取得 ===
@@ -191,6 +198,24 @@ export default function SessionPage() {
       setViewingResults(promptId);
     }
   };
+
+  if (serverError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <p className="text-red-500 font-medium">読み込みエラー</p>
+          <p className="text-gray-500 text-sm mt-2">{serverError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 text-sm px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900"
+          >
+            再読み込み
+          </button>
+          <a href="/" className="text-blue-500 underline mt-3 block text-sm">トップに戻る</a>
+        </div>
+      </main>
+    );
+  }
 
   if (notFound) {
     return (

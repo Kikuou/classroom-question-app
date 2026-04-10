@@ -11,22 +11,28 @@ export async function GET(
 ) {
   const { id } = await params;
   const sessionId = parseInt(id);
-  const [session] = await db
-    .select({
-      id: sessions.id,
-      title: sessions.title,
-      isOpen: sessions.isOpen,
-      courseId: sessions.courseId,
-      courseName: courses.name,
-      courseCode: courses.code,
-      promptDescription: sessions.promptDescription,
-      createdAt: sessions.createdAt,
-    })
-    .from(sessions)
-    .innerJoin(courses, eq(sessions.courseId, courses.id))
-    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
-  if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(session);
+  try {
+    const [session] = await db
+      .select({
+        id: sessions.id,
+        title: sessions.title,
+        isOpen: sessions.isOpen,
+        courseId: sessions.courseId,
+        courseName: courses.name,
+        courseCode: courses.code,
+        promptDescription: sessions.promptDescription,
+        createdAt: sessions.createdAt,
+      })
+      .from(sessions)
+      .innerJoin(courses, eq(sessions.courseId, courses.id))
+      .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
+    if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(session);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[GET /api/sessions/id]", msg);
+    return NextResponse.json({ error: "DBエラーが発生しました", detail: msg }, { status: 500 });
+  }
 }
 
 // セッション更新（公開/締切、タイトル変更）

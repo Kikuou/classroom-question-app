@@ -53,6 +53,8 @@ export default function TeacherSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionError, setSessionError] = useState("");
   const [tab, setTab] = useState<"questions" | "prompts">("questions");
 
   // === 質問タブ state ===
@@ -82,15 +84,27 @@ export default function TeacherSessionPage() {
 
   // === セッション情報取得 ===
   useEffect(() => {
+    setSessionLoading(true);
+    setSessionError("");
     fetch(`/api/sessions/${sessionId}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then(async (r) => {
+        if (r.status === 401) { router.replace("/teacher/login"); return null; }
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          setSessionError(data.detail ?? data.error ?? "セッション情報の取得に失敗しました");
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => {
         if (data) {
           setSession(data);
           setDescInput(data.promptDescription ?? "");
         }
-      });
-  }, [sessionId]);
+      })
+      .catch(() => setSessionError("通信エラーが発生しました"))
+      .finally(() => setSessionLoading(false));
+  }, [sessionId, router]);
 
   // === 質問取得 ===
   const fetchQuestions = useCallback(async () => {
@@ -307,12 +321,18 @@ export default function TeacherSessionPage() {
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
               <button
-                onClick={() => session && router.push(`/teacher/courses/${session.courseId}`)}
+                onClick={() =>
+                  session
+                    ? router.push(`/teacher/courses/${session.courseId}`)
+                    : router.push("/teacher/dashboard")
+                }
                 className="text-xs text-gray-400 hover:text-gray-600 mb-0.5 block"
               >
-                ← 授業一覧
+                ← {session ? "授業一覧" : "ダッシュボード"}
               </button>
-              <h1 className="font-bold text-gray-800 text-sm">{session?.title ?? "読み込み中..."}</h1>
+              <h1 className="font-bold text-gray-800 text-sm">
+                {sessionLoading ? "読み込み中..." : sessionError ? "エラー" : (session?.title ?? "")}
+              </h1>
             </div>
             <button
               onClick={toggleOpen}
@@ -353,6 +373,13 @@ export default function TeacherSessionPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-4 space-y-3">
+        {sessionError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">読み込みエラー</p>
+            <p className="text-xs mt-1">{sessionError}</p>
+            <p className="text-xs mt-1 text-red-500">※ DB側に未適用のカラムがある場合は、Neon SQL Editor で ALTER TABLE を実行してください</p>
+          </div>
+        )}
         {tab === "questions" ? (
           <>
             {/* 統計バー */}
