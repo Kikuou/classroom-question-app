@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { courses, sessions, questions } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireTeacher } from "@/lib/auth";
 
-// 教員: 授業一覧（未対応質問数付き）
+// 教員: 授業一覧（未対応質問数 + セッション一覧付き）
 export async function GET() {
   try {
     await requireTeacher();
@@ -19,6 +19,9 @@ export async function GET() {
 
   if (courseList.length === 0) return NextResponse.json([]);
 
+  const courseIds = courseList.map((c) => c.id);
+
+  // 未対応質問数（授業別）
   const pendingRows = await db
     .select({
       courseId: sessions.courseId,
@@ -33,18 +36,43 @@ export async function GET() {
         eq(questions.isDeleted, false)
       )
     )
-    .where(eq(sessions.isDeleted, false))
+    .where(and(eq(sessions.isDeleted, false), inArray(sessions.courseId, courseIds)))
     .groupBy(sessions.courseId);
 
   const pendingMap: Record<number, number> = {};
   pendingRows.forEach((p) => { pendingMap[p.courseId] = p.pendingCount; });
 
+  // セッション一覧（全授業まとめて取得）
+  const sessionRows = await db
+    .select({
+      id: sessions.id,
+      courseId: sessions.courseId,
+      title: sessions.title,
+      isOpen: sessions.isOpen,
+      discussionOpen: sessions.discussionOpen,
+      sortOrder: sessions.sortOrder,
+      createdAt: sessions.createdAt,
+    })
+    .from(sessions)
+    .where(and(eq(sessions.isDeleted, false), inArray(sessions.courseId, courseIds)))
+    .orderBy(sessions.sortOrder, sessions.createdAt);
+
+  const sessionMap: Record<number, typeof sessionRows> = {};
+  sessionRows.forEach((s) => {
+    if (!sessionMap[s.courseId]) sessionMap[s.courseId] = [];
+    sessionMap[s.courseId].push(s);
+  });
+
   return NextResponse.json(
-    courseList.map((c) => ({ ...c, pendingCount: pendingMap[c.id] ?? 0 }))
+    courseList.map((c) => ({
+      ...c,
+      pendingCount: pendingMap[c.id] ?? 0,
+      sessions: sessionMap[c.id] ?? [],
+    }))
   );
 }
 
-// 授業作成（授業名のみ。コード・パスワードは自動生成）
+// 授業作成（授業名のみ）
 export async function POST(req: Request) {
   try {
     await requireTeacher();
@@ -57,7 +85,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "授業名は必須です" }, { status: 400 });
   }
 
-  // コードは衝突しないようランダム生成（内部管理用）
   const code = Math.random().toString(36).slice(2, 8).toUpperCase();
 
   try {
@@ -65,7 +92,7 @@ export async function POST(req: Request) {
       .insert(courses)
       .values({ name: name.trim(), code, password: "-" })
       .returning();
-    return NextResponse.json(course, { status: 201 });
+    return NextResponse.json({ ...course, pendingCount: 0, sessions: [] }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[POST /api/courses]", msg);
