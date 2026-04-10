@@ -76,6 +76,12 @@ export default function TeacherSessionPage() {
   const [responses, setResponses] = useState<PromptResponseItem[]>([]);
   const promptDragItem = useRef<number | null>(null);
   const promptDragOver = useRef<number | null>(null);
+  // 全問回答一覧
+  const [showOverview, setShowOverview] = useState(false);
+  const [overviewData, setOverviewData] = useState<(PromptItem & { responses: PromptResponseItem[] })[]>([]);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  // 一括切替
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // === 全体説明 state ===
   const [descInput, setDescInput] = useState("");
@@ -288,6 +294,48 @@ export default function TeacherSessionPage() {
     }
   };
 
+  // === 一括結果公開/非公開 ===
+  const bulkToggleVisibility = async (makeVisible: boolean) => {
+    const targets = promptList.filter((p) => !p.isDeleted);
+    if (targets.length === 0) return;
+    setBulkUpdating(true);
+    try {
+      await Promise.all(
+        targets.map((p) =>
+          fetch(`/api/prompts/${p.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isResultsVisible: makeVisible }),
+          })
+        )
+      );
+      setPromptList((prev) =>
+        prev.map((p) => (p.isDeleted ? p : { ...p, isResultsVisible: makeVisible }))
+      );
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  // === 全問回答一覧 ===
+  const loadOverview = async () => {
+    setOverviewLoading(true);
+    const targets = promptList.filter((p) => !p.isDeleted);
+    try {
+      const results = await Promise.all(
+        targets.map(async (p) => {
+          const res = await fetch(`/api/prompts/${p.id}/responses`);
+          const resps: PromptResponseItem[] = res.ok ? await res.json() : [];
+          return { ...p, responses: resps };
+        })
+      );
+      setOverviewData(results);
+      setShowOverview(true);
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
   const handlePromptDragStart = (index: number) => { promptDragItem.current = index; };
   const handlePromptDragEnter = (index: number) => { promptDragOver.current = index; };
   const handlePromptDragEnd = async () => {
@@ -316,6 +364,55 @@ export default function TeacherSessionPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      {/* 全問回答一覧オーバーレイ */}
+      {showOverview && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex flex-col">
+          <div className="flex-1 overflow-y-auto bg-gray-50">
+            <div className="max-w-3xl mx-auto px-4 py-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-800">全問の回答一覧</h2>
+                <button
+                  onClick={() => setShowOverview(false)}
+                  className="text-sm px-4 py-2 bg-gray-800 text-white rounded-xl"
+                >
+                  閉じる
+                </button>
+              </div>
+              {overviewData.length === 0 ? (
+                <p className="text-center text-gray-400 py-12 text-sm">問題がありません</p>
+              ) : (
+                <div className="space-y-6">
+                  {overviewData.map((p, qi) => (
+                    <div key={p.id} className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium mb-1">Q{qi + 1}</p>
+                          <p className="text-sm font-medium text-gray-800 leading-relaxed">{p.content}</p>
+                        </div>
+                        <span className="text-xs text-gray-500 shrink-0 ml-2">{p.responses.length}件</span>
+                      </div>
+                      <div className="border-t pt-3">
+                        {p.responses.length === 0 ? (
+                          <p className="text-xs text-gray-400">まだ回答がありません</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {p.responses.map((r) => (
+                              <div key={r.id} className="bg-purple-50 rounded-xl px-3 py-2 text-sm text-purple-800">
+                                {r.answer}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-start justify-between gap-2 mb-2">
@@ -453,6 +550,34 @@ export default function TeacherSessionPage() {
           </>
         ) : (
           <>
+            {/* 一括操作バー */}
+            {promptList.filter((p) => !p.isDeleted).length > 0 && (
+              <div className="bg-white rounded-xl border p-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-500 font-medium">一括操作:</span>
+                <button
+                  onClick={() => bulkToggleVisibility(true)}
+                  disabled={bulkUpdating}
+                  className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg border border-green-200 hover:bg-green-200 disabled:opacity-50"
+                >
+                  全問公開
+                </button>
+                <button
+                  onClick={() => bulkToggleVisibility(false)}
+                  disabled={bulkUpdating}
+                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  全問非公開
+                </button>
+                <button
+                  onClick={loadOverview}
+                  disabled={overviewLoading}
+                  className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg border border-purple-200 hover:bg-purple-200 disabled:opacity-50 ml-auto"
+                >
+                  {overviewLoading ? "読み込み中..." : "📋 全問の回答を一覧表示"}
+                </button>
+              </div>
+            )}
+
             {/* 全体説明カード */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between">
@@ -730,7 +855,7 @@ function TeacherQuestionCard({
               onChange={(e) => onReplyChange(e.target.value)}
               placeholder="返信を入力..."
               className="flex-1 min-w-0 border border-gray-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
-              onKeyDown={(e) => e.key === "Enter" && !submitting && onReplySubmit()}
+              onKeyDown={(e) => e.key === "Enter" && !submitting && !e.nativeEvent.isComposing && onReplySubmit()}
               autoFocus
             />
             <button
