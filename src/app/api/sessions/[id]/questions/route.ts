@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { questions, replies, likes, sessions } from "@/db/schema";
 import { eq, sql, and, ne, inArray } from "drizzle-orm";
-import { getTeacherId } from "@/lib/auth";
+import { isTeacher } from "@/lib/auth";
 
 // 質問一覧（いいね数・返信含む）
 export async function GET(
@@ -16,8 +16,8 @@ export async function GET(
   const sort = url.searchParams.get("sort") ?? "time";
   const clientId = url.searchParams.get("clientId") ?? "";
 
-  const isTeacher = !!(await getTeacherId());
-  const showAll = all && isTeacher;
+  const teacher = await isTeacher();
+  const showAll = all && teacher;
 
   const rows = await db
     .select({
@@ -73,13 +73,13 @@ export async function GET(
     clientLikes.forEach((l) => clientLikedSet.add(l.questionId));
   }
 
-  const result = rows.map((q) => ({
-    ...q,
-    likedByClient: clientLikedSet.has(q.id),
-    replies: replyMap[q.id] ?? [],
-  }));
-
-  return NextResponse.json(result);
+  return NextResponse.json(
+    rows.map((q) => ({
+      ...q,
+      likedByClient: clientLikedSet.has(q.id),
+      replies: replyMap[q.id] ?? [],
+    }))
+  );
 }
 
 // 質問投稿

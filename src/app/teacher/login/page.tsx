@@ -5,21 +5,20 @@ import { useRouter } from "next/navigation";
 
 export default function TeacherLoginPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !password) return;
+    if (!password) return;
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/teacher/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), password }),
+        body: JSON.stringify({ password }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -37,52 +36,30 @@ export default function TeacherLoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-800">教員ログイン</h1>
-          <p className="text-gray-500 text-sm mt-1">教員名とパスワードを入力してください</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
-          <form onSubmit={handleLogin} className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">教員名</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="登録時の名前"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                maxLength={50}
-                autoFocus
-              />
-            </div>
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">パスワード</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="パスワード"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="パスワードを入力"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                autoFocus
               />
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !name.trim() || !password}
+              disabled={loading || !password}
               className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold text-sm hover:bg-gray-900 disabled:opacity-50 transition-colors"
             >
               {loading ? "ログイン中..." : "ログイン"}
             </button>
           </form>
-
-          <div className="border-t pt-4 text-center">
-            <p className="text-xs text-gray-500 mb-2">初めての方はアカウントを作成してください</p>
-            <a
-              href="/teacher/register"
-              className="block w-full text-center border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-            >
-              新規アカウント登録
-            </a>
-          </div>
         </div>
 
         <div className="mt-4 text-center">

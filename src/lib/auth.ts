@@ -5,27 +5,25 @@ const SECRET = new TextEncoder().encode(
   process.env.TEACHER_SECRET ?? "dev-secret-change-in-production"
 );
 
-export async function createTeacherToken(teacherId: number): Promise<string> {
-  return new SignJWT({ teacherId })
+export async function createTeacherToken(): Promise<string> {
+  return new SignJWT({ teacher: true })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("24h")
     .sign(SECRET);
 }
 
-export async function getTeacherId(): Promise<number | null> {
+export async function isTeacher(): Promise<boolean> {
   const cookieStore = await cookies();
   const token = cookieStore.get("teacher_token")?.value;
-  if (!token) return null;
+  if (!token) return false;
   try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return payload.teacherId as number;
+    await jwtVerify(token, SECRET);
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
-export async function requireTeacher(): Promise<number> {
-  const teacherId = await getTeacherId();
-  if (!teacherId) throw new Error("Unauthorized");
-  return teacherId;
+export async function requireTeacher(): Promise<void> {
+  if (!(await isTeacher())) throw new Error("Unauthorized");
 }

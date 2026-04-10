@@ -5,11 +5,10 @@ import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { requireTeacher } from "@/lib/auth";
 
-// 教員: 自分の授業一覧（未対応質問数付き）
+// 教員: 授業一覧（未対応質問数付き）
 export async function GET() {
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -17,12 +16,10 @@ export async function GET() {
   const courseList = await db
     .select()
     .from(courses)
-    .where(eq(courses.teacherId, teacherId))
     .orderBy(courses.createdAt);
 
   if (courseList.length === 0) return NextResponse.json([]);
 
-  // 各授業の未対応質問数を取得
   const pendingRows = await db
     .select({
       courseId: sessions.courseId,
@@ -50,9 +47,8 @@ export async function GET() {
 
 // 授業作成（要ログイン）
 export async function POST(req: Request) {
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -65,7 +61,7 @@ export async function POST(req: Request) {
   try {
     const [course] = await db
       .insert(courses)
-      .values({ name: name.trim(), code: code.trim().toUpperCase(), password: hashed, teacherId })
+      .values({ name: name.trim(), code: code.trim().toUpperCase(), password: hashed })
       .returning();
     return NextResponse.json(course, { status: 201 });
   } catch (e) {
