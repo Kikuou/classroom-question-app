@@ -10,15 +10,18 @@ export default function TeacherLoginPage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
-  // パスワード設定済みかチェック。未設定なら setup へ
   useEffect(() => {
     fetch("/api/teacher/setup")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.configured) router.replace("/teacher/setup");
-        else setChecking(false);
+        if (!data.configured) {
+          router.replace("/teacher/setup");
+        } else {
+          setChecking(false);
+        }
       })
-      .catch(() => setChecking(false));
+      // APIエラー（テーブル未作成など）もsetupへ
+      .catch(() => router.replace("/teacher/setup"));
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
