@@ -3,42 +3,38 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function TeacherLoginPage() {
+export default function TeacherSetupPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
-  // パスワード設定済みかチェック。未設定なら setup へ
+  // 既にパスワード設定済みならログインへ
   useEffect(() => {
     fetch("/api/teacher/setup")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.configured) router.replace("/teacher/setup");
+        if (data.configured) router.replace("/teacher/login");
         else setChecking(false);
       })
       .catch(() => setChecking(false));
   }, [router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/teacher/login", {
+      const res = await fetch("/api/teacher/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
       if (!res.ok) {
         const data = await res.json();
-        if (data.error === "setup_required") {
-          router.replace("/teacher/setup");
-          return;
-        }
-        setError(data.error ?? "ログインに失敗しました");
+        setError(data.error ?? "設定に失敗しました");
         return;
       }
       router.push("/teacher/dashboard");
@@ -53,18 +49,23 @@ export default function TeacherLoginPage() {
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-gray-50">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">教員ログイン</h1>
+          <h1 className="text-2xl font-bold text-gray-800">初回パスワード設定</h1>
+          <p className="text-gray-500 text-sm mt-2">
+            教員ログイン用のパスワードを設定してください
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border p-6">
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSetup} className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">パスワード</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                パスワード（4文字以上）
+              </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="パスワードを入力"
+                placeholder="新しいパスワード"
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 autoFocus
               />
@@ -72,18 +73,12 @@ export default function TeacherLoginPage() {
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !password}
-              className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold text-sm hover:bg-gray-900 disabled:opacity-50 transition-colors"
+              disabled={loading || password.length < 4}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? "ログイン中..." : "ログイン"}
+              {loading ? "設定中..." : "パスワードを設定してログイン"}
             </button>
           </form>
-        </div>
-
-        <div className="mt-4 text-center">
-          <a href="/" className="text-sm text-gray-400 hover:text-gray-600 underline">
-            学生ページに戻る
-          </a>
         </div>
       </div>
     </main>

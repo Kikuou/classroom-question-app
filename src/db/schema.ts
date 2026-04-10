@@ -8,12 +8,9 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
-// 教員アカウント（新規）
-export const teachers = pgTable("teachers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  password: text("password").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
 export const courses = pgTable("courses", {
@@ -21,7 +18,6 @@ export const courses = pgTable("courses", {
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   password: text("password").notNull(),
-  teacherId: integer("teacher_id").references(() => teachers.id),
   isVisible: boolean("is_visible").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -79,7 +75,6 @@ export const likes = pgTable(
   })
 );
 
-export type Teacher = typeof teachers.$inferSelect;
 export type Course = typeof courses.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Question = typeof questions.$inferSelect;
