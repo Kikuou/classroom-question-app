@@ -24,9 +24,7 @@ export async function GET(
     .from(sessions)
     .innerJoin(courses, eq(sessions.courseId, courses.id))
     .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
-  if (!session) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(session);
 }
 
@@ -36,23 +34,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const sessionId = parseInt(id);
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // 自分の授業のセッションか確認
-  const [existing] = await db
-    .select({ id: sessions.id, courseId: sessions.courseId })
-    .from(sessions)
-    .innerJoin(courses, eq(sessions.courseId, courses.id))
-    .where(and(eq(sessions.id, sessionId), eq(courses.teacherId, teacherId)));
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   const body = await req.json();
   const updateData: Partial<{ isOpen: boolean; title: string }> = {};
   if (typeof body.isOpen === "boolean") updateData.isOpen = body.isOpen;
@@ -61,8 +47,9 @@ export async function PATCH(
   const [session] = await db
     .update(sessions)
     .set(updateData)
-    .where(eq(sessions.id, sessionId))
+    .where(eq(sessions.id, parseInt(id)))
     .returning();
+  if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(session);
 }
 
@@ -72,24 +59,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const sessionId = parseInt(id);
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const [existing] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .innerJoin(courses, eq(sessions.courseId, courses.id))
-    .where(and(eq(sessions.id, sessionId), eq(courses.teacherId, teacherId)));
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  await db
-    .update(sessions)
-    .set({ isDeleted: true })
-    .where(eq(sessions.id, sessionId));
+  await db.update(sessions).set({ isDeleted: true }).where(eq(sessions.id, parseInt(id)));
   return NextResponse.json({ ok: true });
 }

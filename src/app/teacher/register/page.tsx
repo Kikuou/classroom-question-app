@@ -7,17 +7,12 @@ export default function TeacherRegisterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !password) return;
-    if (password !== confirm) {
-      setError("パスワードが一致しません");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
@@ -60,7 +55,7 @@ export default function TeacherRegisterPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">パスワード（6文字以上）</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">パスワード（4文字以上）</label>
               <input
                 type="password"
                 value={password}
@@ -69,20 +64,10 @@ export default function TeacherRegisterPage() {
                 className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">パスワード確認</label>
-              <input
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                placeholder="パスワード再入力"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !name.trim() || !password || !confirm}
+              disabled={loading || !name.trim() || !password}
               className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {loading ? "登録中..." : "アカウントを作成"}
@@ -90,10 +75,7 @@ export default function TeacherRegisterPage() {
           </form>
 
           <div className="border-t mt-4 pt-4 text-center">
-            <a
-              href="/teacher/login"
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-            >
+            <a href="/teacher/login" className="text-sm text-gray-500 hover:text-gray-700 underline">
               既にアカウントをお持ちの方はこちら
             </a>
           </div>

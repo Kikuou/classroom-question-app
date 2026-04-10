@@ -10,11 +10,10 @@ export async function POST(req: Request) {
   if (!name?.trim() || !password) {
     return NextResponse.json({ error: "名前とパスワードは必須です" }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "パスワードは6文字以上にしてください" }, { status: 400 });
+  if (password.length < 4) {
+    return NextResponse.json({ error: "パスワードは4文字以上にしてください" }, { status: 400 });
   }
 
-  // 同名チェック
   const existing = await db.select().from(teachers).where(eq(teachers.name, name.trim()));
   if (existing.length > 0) {
     return NextResponse.json({ error: "その名前は既に使用されています" }, { status: 409 });

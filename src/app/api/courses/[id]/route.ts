@@ -10,20 +10,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const courseId = parseInt(id);
-  const [course] = await db
-    .select()
-    .from(courses)
-    .where(and(eq(courses.id, courseId), eq(courses.teacherId, teacherId)));
-  if (!course) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
+  if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const sessionList = await db
     .select()
     .from(sessions)
@@ -32,19 +27,17 @@ export async function GET(
   return NextResponse.json({ course, sessions: sessionList });
 }
 
-// 授業更新（名前・isVisible変更）
+// 授業更新（isVisible変更）
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  let teacherId: number;
   try {
-    teacherId = await requireTeacher();
+    await requireTeacher();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const courseId = parseInt(id);
   const body = await req.json();
   const updateData: Partial<{ isVisible: boolean }> = {};
   if (typeof body.isVisible === "boolean") updateData.isVisible = body.isVisible;
@@ -52,7 +45,7 @@ export async function PATCH(
   const [course] = await db
     .update(courses)
     .set(updateData)
-    .where(and(eq(courses.id, courseId), eq(courses.teacherId, teacherId)))
+    .where(eq(courses.id, parseInt(id)))
     .returning();
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(course);
