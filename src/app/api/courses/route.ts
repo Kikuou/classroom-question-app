@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { courses, sessions, questions } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import { requireTeacher } from "@/lib/auth";
 
 // 教員: 授業一覧（未対応質問数付き）
@@ -45,7 +44,7 @@ export async function GET() {
   );
 }
 
-// 授業作成（要ログイン）
+// 授業作成（授業名のみ。コード・パスワードは自動生成）
 export async function POST(req: Request) {
   try {
     await requireTeacher();
@@ -53,22 +52,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name, code, password } = await req.json();
-  if (!name?.trim() || !code?.trim() || !password) {
-    return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
+  const { name } = await req.json();
+  if (!name?.trim()) {
+    return NextResponse.json({ error: "授業名は必須です" }, { status: 400 });
   }
-  const hashed = await bcrypt.hash(password, 10);
+
+  // コードは衝突しないようランダム生成（内部管理用）
+  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+
   try {
     const [course] = await db
       .insert(courses)
-      .values({ name: name.trim(), code: code.trim().toUpperCase(), password: hashed })
+      .values({ name: name.trim(), code, password: "-" })
       .returning();
     return NextResponse.json(course, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("23505") || msg.includes("unique")) {
-      return NextResponse.json({ error: "授業コードが既に使用されています" }, { status: 409 });
-    }
     console.error("[POST /api/courses]", msg);
     return NextResponse.json({ error: `DBエラー: ${msg}` }, { status: 500 });
   }

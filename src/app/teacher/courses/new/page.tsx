@@ -6,21 +6,19 @@ import { useRouter } from "next/navigation";
 export default function NewCoursePage() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !code.trim() || !password) return;
+    if (!name.trim()) return;
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), code: code.trim(), password }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -46,8 +44,8 @@ export default function NewCoursePage() {
           <h1 className="text-2xl font-bold text-gray-800">新規授業を作成</h1>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">授業名</label>
               <input
@@ -55,40 +53,15 @@ export default function NewCoursePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="例: 有機化学 I"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 maxLength={100}
                 autoFocus
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">
-                授業コード <span className="text-gray-400 font-normal">（学生には表示されます）</span>
-              </label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                placeholder="例: CHEM2024"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-mono uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-400"
-                maxLength={20}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">
-                授業パスワード <span className="text-gray-400 font-normal">（現在は不使用）</span>
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="任意のパスワード"
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !name.trim() || !code.trim() || !password}
+              disabled={loading || !name.trim()}
               className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold text-sm hover:bg-gray-900 disabled:opacity-50 transition-colors"
             >
               {loading ? "作成中..." : "授業を作成"}
