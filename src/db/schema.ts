@@ -75,8 +75,38 @@ export const likes = pgTable(
   })
 );
 
+export const prompts = pgTable("prompts", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isResultsVisible: boolean("is_results_visible").default(false).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const promptResponses = pgTable(
+  "prompt_responses",
+  {
+    id: serial("id").primaryKey(),
+    promptId: integer("prompt_id")
+      .notNull()
+      .references(() => prompts.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    answer: text("answer").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    uniqueResponse: unique().on(t.promptId, t.clientId),
+  })
+);
+
 export type Course = typeof courses.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Reply = typeof replies.$inferSelect;
 export type Like = typeof likes.$inferSelect;
+export type Prompt = typeof prompts.$inferSelect;
+export type PromptResponse = typeof promptResponses.$inferSelect;

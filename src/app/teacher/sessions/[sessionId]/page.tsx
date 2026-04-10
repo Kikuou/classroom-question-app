@@ -22,6 +22,22 @@ interface Question {
   replies: Reply[];
 }
 
+interface PromptItem {
+  id: number;
+  content: string;
+  sortOrder: number;
+  isResultsVisible: boolean;
+  isDeleted: boolean;
+  responseCount: number;
+  createdAt: string;
+}
+
+interface PromptResponseItem {
+  id: number;
+  answer: string;
+  createdAt: string;
+}
+
 interface SessionInfo {
   id: number;
   title: string;
@@ -36,6 +52,9 @@ export default function TeacherSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [tab, setTab] = useState<"questions" | "prompts">("questions");
+
+  // === 質問タブ state ===
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sort, setSort] = useState<"time" | "likes" | "manual">("time");
   const [replyInputs, setReplyInputs] = useState<Record<number, string>>({});
@@ -45,6 +64,24 @@ export default function TeacherSessionPage() {
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
 
+  // === ディスカッション問題タブ state ===
+  const [promptList, setPromptList] = useState<PromptItem[]>([]);
+  const [newPromptContent, setNewPromptContent] = useState("");
+  const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [viewingResponses, setViewingResponses] = useState<number | null>(null);
+  const [responses, setResponses] = useState<PromptResponseItem[]>([]);
+  const promptDragItem = useRef<number | null>(null);
+  const promptDragOver = useRef<number | null>(null);
+
+  // === セッション情報取得 ===
+  useEffect(() => {
+    fetch(`/api/sessions/${sessionId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => data && setSession(data));
+  }, [sessionId]);
+
+  // === 質問取得 ===
   const fetchQuestions = useCallback(async () => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -59,24 +96,35 @@ export default function TeacherSessionPage() {
       }
       if (res.ok) setQuestions(await res.json());
     } catch {
-      // AbortError は無視
+      // AbortError
     }
   }, [sessionId, sort, router]);
 
-  useEffect(() => {
-    fetch(`/api/sessions/${sessionId}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => data && setSession(data));
-  }, [sessionId]);
+  // === プロンプト取得 ===
+  const fetchPrompts = useCallback(async () => {
+    const res = await fetch(`/api/sessions/${sessionId}/prompts`);
+    if (res.status === 401) {
+      router.replace("/teacher/login");
+      return;
+    }
+    if (res.ok) setPromptList(await res.json());
+  }, [sessionId, router]);
 
+  // === ポーリング ===
   useEffect(() => {
-    fetchQuestions();
-    const timer = setInterval(fetchQuestions, POLL_INTERVAL);
-    return () => {
-      clearInterval(timer);
-      abortRef.current?.abort();
-    };
-  }, [fetchQuestions]);
+    if (tab === "questions") {
+      fetchQuestions();
+      const timer = setInterval(fetchQuestions, POLL_INTERVAL);
+      return () => {
+        clearInterval(timer);
+        abortRef.current?.abort();
+      };
+    } else {
+      fetchPrompts();
+      const timer = setInterval(fetchPrompts, POLL_INTERVAL);
+      return () => clearInterval(timer);
+    }
+  }, [tab, fetchQuestions, fetchPrompts]);
 
   const toggleOpen = async () => {
     if (!session) return;
@@ -91,6 +139,7 @@ export default function TeacherSessionPage() {
     }
   };
 
+  // === 質問操作 ===
   const submitReply = async (questionId: number) => {
     const content = replyInputs[questionId]?.trim();
     if (!content) return;
@@ -116,13 +165,11 @@ export default function TeacherSessionPage() {
     if (res.ok) setQuestions((prev) => prev.filter((q) => q.id !== questionId));
   };
 
-  // ドラッグ&ドロップ（manualモード時）
   const handleDragStart = (index: number) => { dragItem.current = index; };
   const handleDragEnter = (index: number) => { dragOver.current = index; };
   const handleDragEnd = async () => {
     if (dragItem.current === null || dragOver.current === null) return;
     if (dragItem.current === dragOver.current) return;
-
     const updated = [...questions];
     const [moved] = updated.splice(dragItem.current, 1);
     updated.splice(dragOver.current, 0, moved);
@@ -130,11 +177,89 @@ export default function TeacherSessionPage() {
     setQuestions(reordered);
     dragItem.current = null;
     dragOver.current = null;
-
     await fetch("/api/questions/sort", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderedIds: reordered.map((q) => q.id) }),
+    });
+  };
+
+  // === プロンプト操作 ===
+  const createPrompt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPromptContent.trim()) return;
+    const res = await fetch(`/api/sessions/${sessionId}/prompts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: newPromptContent.trim() }),
+    });
+    if (res.ok) {
+      setNewPromptContent("");
+      await fetchPrompts();
+    }
+  };
+
+  const updatePrompt = async (promptId: number) => {
+    if (!editContent.trim()) return;
+    const res = await fetch(`/api/prompts/${promptId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: editContent.trim() }),
+    });
+    if (res.ok) {
+      setEditingPromptId(null);
+      setEditContent("");
+      await fetchPrompts();
+    }
+  };
+
+  const deletePrompt = async (promptId: number) => {
+    if (!confirm("この問題を削除しますか？")) return;
+    const res = await fetch(`/api/prompts/${promptId}`, { method: "DELETE" });
+    if (res.ok) setPromptList((prev) => prev.filter((p) => p.id !== promptId));
+  };
+
+  const toggleResultsVisible = async (promptId: number, current: boolean) => {
+    const res = await fetch(`/api/prompts/${promptId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isResultsVisible: !current }),
+    });
+    if (res.ok) {
+      setPromptList((prev) =>
+        prev.map((p) => p.id === promptId ? { ...p, isResultsVisible: !current } : p)
+      );
+    }
+  };
+
+  const viewResponses = async (promptId: number) => {
+    if (viewingResponses === promptId) {
+      setViewingResponses(null);
+      return;
+    }
+    const res = await fetch(`/api/prompts/${promptId}/responses`);
+    if (res.ok) {
+      setResponses(await res.json());
+      setViewingResponses(promptId);
+    }
+  };
+
+  const handlePromptDragStart = (index: number) => { promptDragItem.current = index; };
+  const handlePromptDragEnter = (index: number) => { promptDragOver.current = index; };
+  const handlePromptDragEnd = async () => {
+    if (promptDragItem.current === null || promptDragOver.current === null) return;
+    if (promptDragItem.current === promptDragOver.current) return;
+    const updated = [...promptList];
+    const [moved] = updated.splice(promptDragItem.current, 1);
+    updated.splice(promptDragOver.current, 0, moved);
+    const reordered = updated.map((p, i) => ({ ...p, sortOrder: i }));
+    setPromptList(reordered);
+    promptDragItem.current = null;
+    promptDragOver.current = null;
+    await fetch("/api/prompts/sort", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: reordered.map((p) => p.id) }),
     });
   };
 
@@ -170,76 +295,236 @@ export default function TeacherSessionPage() {
               {session?.isOpen ? "締め切る" : "再開する"}
             </button>
           </div>
-          {/* 統計バー */}
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-gray-500">全 {counts.total} 件</span>
-            <span className="text-yellow-600 font-medium">未対応 {counts.pending}</span>
-            <span className="text-green-600 font-medium">回答済 {counts.answered}</span>
-            {counts.hidden > 0 && (
-              <span className="text-gray-400">非表示 {counts.hidden}</span>
-            )}
+
+          {/* タブ切替 */}
+          <div className="flex gap-1 mt-2">
+            <button
+              onClick={() => setTab("questions")}
+              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                tab === "questions"
+                  ? "bg-gray-800 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              質問管理
+            </button>
+            <button
+              onClick={() => setTab("prompts")}
+              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                tab === "prompts"
+                  ? "bg-gray-800 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              ディスカッション問題
+            </button>
           </div>
         </div>
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-4 space-y-3">
-        {/* ツールバー */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex gap-1">
-            {(["time", "likes", "manual"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSort(s)}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  sort === s
-                    ? "bg-gray-800 text-white"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {s === "time" ? "新着順" : s === "likes" ? "いいね順" : "手動並替"}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={exportSort}
-              onChange={(e) => setExportSort(e.target.value as "time" | "likes")}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600"
-            >
-              <option value="likes">いいね順でCSV</option>
-              <option value="time">時系列でCSV</option>
-            </select>
-            <a
-              href={`/api/sessions/${sessionId}/export?sort=${exportSort}`}
-              className="text-xs px-3 py-1.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 text-gray-600"
-            >
-              CSV出力
-            </a>
-          </div>
-        </div>
+        {tab === "questions" ? (
+          <>
+            {/* 統計バー */}
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-gray-500">全 {counts.total} 件</span>
+              <span className="text-yellow-600 font-medium">未対応 {counts.pending}</span>
+              <span className="text-green-600 font-medium">回答済 {counts.answered}</span>
+              {counts.hidden > 0 && (
+                <span className="text-gray-400">非表示 {counts.hidden}</span>
+              )}
+            </div>
 
-        {sort === "manual" && questions.length > 0 && (
-          <p className="text-xs text-gray-400">ドラッグ&ドロップで並び替えできます</p>
-        )}
+            {/* ツールバー */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex gap-1">
+                {(["time", "likes", "manual"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSort(s)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      sort === s
+                        ? "bg-gray-800 text-white"
+                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s === "time" ? "新着順" : s === "likes" ? "いいね順" : "手動並替"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={exportSort}
+                  onChange={(e) => setExportSort(e.target.value as "time" | "likes")}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600"
+                >
+                  <option value="likes">いいね順でCSV</option>
+                  <option value="time">時系列でCSV</option>
+                </select>
+                <a
+                  href={`/api/sessions/${sessionId}/export?sort=${exportSort}`}
+                  className="text-xs px-3 py-1.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 text-gray-600"
+                >
+                  CSV出力
+                </a>
+              </div>
+            </div>
 
-        {questions.length === 0 ? (
-          <div className="text-center text-gray-400 py-12 text-sm">質問がありません</div>
+            {sort === "manual" && questions.length > 0 && (
+              <p className="text-xs text-gray-400">ドラッグ&ドロップで並び替えできます</p>
+            )}
+
+            {questions.length === 0 ? (
+              <div className="text-center text-gray-400 py-12 text-sm">質問がありません</div>
+            ) : (
+              questions.map((q, index) => (
+                <TeacherQuestionCard
+                  key={q.id}
+                  question={q}
+                  replyInput={replyInputs[q.id] ?? ""}
+                  onReplyChange={(v) => setReplyInputs((prev) => ({ ...prev, [q.id]: v }))}
+                  onReplySubmit={() => submitReply(q.id)}
+                  onDelete={() => deleteQuestion(q.id)}
+                  submitting={submittingReply === q.id}
+                  draggable={sort === "manual"}
+                  onDragStart={() => handleDragStart(index)}
+                  onDragEnter={() => handleDragEnter(index)}
+                  onDragEnd={handleDragEnd}
+                />
+              ))
+            )}
+          </>
         ) : (
-          questions.map((q, index) => (
-            <TeacherQuestionCard
-              key={q.id}
-              question={q}
-              replyInput={replyInputs[q.id] ?? ""}
-              onReplyChange={(v) => setReplyInputs((prev) => ({ ...prev, [q.id]: v }))}
-              onReplySubmit={() => submitReply(q.id)}
-              onDelete={() => deleteQuestion(q.id)}
-              submitting={submittingReply === q.id}
-              draggable={sort === "manual"}
-              onDragStart={() => handleDragStart(index)}
-              onDragEnter={() => handleDragEnter(index)}
-              onDragEnd={handleDragEnd}
-            />
-          ))
+          <>
+            {/* プロンプト作成フォーム */}
+            <form onSubmit={createPrompt} className="bg-white rounded-2xl shadow-sm border p-4">
+              <h2 className="font-semibold text-gray-700 mb-3 text-sm">新しい問題を追加</h2>
+              <div className="flex gap-2">
+                <textarea
+                  value={newPromptContent}
+                  onChange={(e) => setNewPromptContent(e.target.value)}
+                  placeholder="問題文を入力..."
+                  rows={2}
+                  className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  maxLength={500}
+                />
+                <button
+                  type="submit"
+                  disabled={!newPromptContent.trim()}
+                  className="self-end text-xs px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                >
+                  追加
+                </button>
+              </div>
+            </form>
+
+            {promptList.length > 0 && (
+              <p className="text-xs text-gray-400">ドラッグ&ドロップで並び替えできます</p>
+            )}
+
+            {/* プロンプト一覧 */}
+            {promptList.length === 0 ? (
+              <div className="text-center text-gray-400 py-12 text-sm">問題がありません</div>
+            ) : (
+              promptList.map((p, index) => (
+                <div
+                  key={p.id}
+                  draggable
+                  onDragStart={() => handlePromptDragStart(index)}
+                  onDragEnter={() => handlePromptDragEnter(index)}
+                  onDragEnd={handlePromptDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                  className={`bg-white rounded-2xl shadow-sm border p-4 space-y-3 cursor-grab active:cursor-grabbing ${
+                    p.isDeleted ? "opacity-40" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-300 text-lg mt-0.5 shrink-0">⠿</span>
+                    {editingPromptId === p.id ? (
+                      <div className="flex-1 flex gap-2">
+                        <textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          rows={2}
+                          autoFocus
+                        />
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => updatePrompt(p.id)}
+                            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            保存
+                          </button>
+                          <button
+                            onClick={() => setEditingPromptId(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-800 leading-relaxed flex-1">{p.content}</p>
+                    )}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-xs text-gray-500">{p.responseCount} 件回答</span>
+                      <button
+                        onClick={() => toggleResultsVisible(p.id, p.isResultsVisible)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          p.isResultsVisible
+                            ? "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
+                            : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
+                        }`}
+                      >
+                        {p.isResultsVisible ? "結果公開中" : "結果非公開"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 操作ボタン */}
+                  <div className="border-t pt-2 flex items-center gap-2">
+                    <button
+                      onClick={() => viewResponses(p.id)}
+                      className="text-xs text-blue-500 hover:text-blue-700"
+                    >
+                      {viewingResponses === p.id ? "回答を閉じる" : "回答を見る"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingPromptId(p.id);
+                        setEditContent(p.content);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      編集
+                    </button>
+                    <button
+                      onClick={() => deletePrompt(p.id)}
+                      className="text-xs text-red-400 hover:text-red-600 ml-auto"
+                    >
+                      削除
+                    </button>
+                  </div>
+
+                  {/* 回答一覧 */}
+                  {viewingResponses === p.id && (
+                    <div className="space-y-1">
+                      {responses.length === 0 ? (
+                        <p className="text-xs text-gray-400">まだ回答がありません</p>
+                      ) : (
+                        responses.map((r) => (
+                          <div key={r.id} className="bg-purple-50 rounded-xl px-3 py-2 text-xs text-purple-800">
+                            {r.answer}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </>
         )}
       </div>
     </main>
@@ -295,7 +580,6 @@ function TeacherQuestionCard({
         status === "hidden" ? "opacity-40" : ""
       } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
-      {/* 質問本文 + いいね・ステータス */}
       <div className="flex items-start gap-2">
         {draggable && <span className="text-gray-300 text-lg mt-0.5 shrink-0">⠿</span>}
         <p className="text-sm text-gray-800 leading-relaxed flex-1">{question.content}</p>
@@ -308,19 +592,16 @@ function TeacherQuestionCard({
         </div>
       </div>
 
-      {/* メタ情報 */}
       <div className="text-xs text-gray-400">
         {question.authorName ?? "匿名"} · {dt}
       </div>
 
-      {/* ステータス切替 */}
       <StatusSelector
         questionId={question.id}
         currentStatus={status}
         onStatusChange={setStatus}
       />
 
-      {/* 返信一覧 */}
       {hasReply && (
         <div className="space-y-1">
           {question.replies.map((r) => (
@@ -332,7 +613,6 @@ function TeacherQuestionCard({
         </div>
       )}
 
-      {/* 返信入力 + 削除ボタン */}
       <div className="border-t pt-2 flex items-center gap-2">
         {showReply ? (
           <div className="flex gap-2 flex-1">

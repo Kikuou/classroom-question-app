@@ -23,6 +23,20 @@ interface Question {
   replies: Reply[];
 }
 
+interface PromptItem {
+  id: number;
+  content: string;
+  isResultsVisible: boolean;
+  responseCount: number;
+  myAnswer: string | null;
+}
+
+interface PromptResponseItem {
+  id: number;
+  answer: string;
+  createdAt: string;
+}
+
 interface SessionInfo {
   id: number;
   title: string;
@@ -35,6 +49,10 @@ const POLL_INTERVAL = 5000;
 export default function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [tab, setTab] = useState<"questions" | "prompts">("questions");
+  const [notFound, setNotFound] = useState(false);
+
+  // === 質問タブ state ===
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sort, setSort] = useState<"time" | "likes">("time");
   const [content, setContent] = useState("");
@@ -42,11 +60,27 @@ export default function SessionPage() {
   const [anonymous, setAnonymous] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [notFound, setNotFound] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  // === ディスカッション問題タブ state ===
+  const [promptList, setPromptList] = useState<PromptItem[]>([]);
+  const [answerInputs, setAnswerInputs] = useState<Record<number, string>>({});
+  const [submittingPromptId, setSubmittingPromptId] = useState<number | null>(null);
+  const [viewingResults, setViewingResults] = useState<number | null>(null);
+  const [resultResponses, setResultResponses] = useState<PromptResponseItem[]>([]);
+
+  // === セッション情報取得 ===
+  useEffect(() => {
+    fetch(`/api/sessions/${sessionId}`)
+      .then((r) => {
+        if (!r.ok) { setNotFound(true); return null; }
+        return r.json();
+      })
+      .then((data) => data && setSession(data));
+  }, [sessionId]);
+
+  // === 質問取得 ===
   const fetchQuestions = useCallback(async () => {
-    // 進行中のフェッチをキャンセル
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     const clientId = getClientId();
@@ -57,28 +91,45 @@ export default function SessionPage() {
       );
       if (res.ok) setQuestions(await res.json());
     } catch {
-      // AbortError は無視
+      // AbortError
     }
   }, [sessionId, sort]);
 
-  useEffect(() => {
-    fetch(`/api/sessions/${sessionId}`)
-      .then((r) => {
-        if (!r.ok) { setNotFound(true); return null; }
-        return r.json();
-      })
-      .then((data) => data && setSession(data));
+  // === プロンプト取得 ===
+  const fetchPrompts = useCallback(async () => {
+    const clientId = getClientId();
+    const res = await fetch(
+      `/api/sessions/${sessionId}/prompts?clientId=${clientId}`
+    );
+    if (res.ok) {
+      const data: PromptItem[] = await res.json();
+      setPromptList(data);
+      // 既存回答をinputに反映
+      const inputs: Record<number, string> = {};
+      data.forEach((p) => {
+        if (p.myAnswer) inputs[p.id] = p.myAnswer;
+      });
+      setAnswerInputs((prev) => ({ ...prev, ...inputs }));
+    }
   }, [sessionId]);
 
+  // === ポーリング ===
   useEffect(() => {
-    fetchQuestions();
-    const timer = setInterval(fetchQuestions, POLL_INTERVAL);
-    return () => {
-      clearInterval(timer);
-      abortRef.current?.abort();
-    };
-  }, [fetchQuestions]);
+    if (tab === "questions") {
+      fetchQuestions();
+      const timer = setInterval(fetchQuestions, POLL_INTERVAL);
+      return () => {
+        clearInterval(timer);
+        abortRef.current?.abort();
+      };
+    } else {
+      fetchPrompts();
+      const timer = setInterval(fetchPrompts, POLL_INTERVAL);
+      return () => clearInterval(timer);
+    }
+  }, [tab, fetchQuestions, fetchPrompts]);
 
+  // === 質問投稿 ===
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
@@ -107,6 +158,39 @@ export default function SessionPage() {
     }
   };
 
+  // === ディスカッション回答送信 ===
+  const submitAnswer = async (promptId: number) => {
+    const answer = answerInputs[promptId]?.trim();
+    if (!answer) return;
+    setSubmittingPromptId(promptId);
+    const clientId = getClientId();
+    try {
+      const res = await fetch(`/api/prompts/${promptId}/responses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer, clientId }),
+      });
+      if (res.ok) {
+        await fetchPrompts();
+      }
+    } finally {
+      setSubmittingPromptId(null);
+    }
+  };
+
+  // === 結果表示 ===
+  const viewResults = async (promptId: number) => {
+    if (viewingResults === promptId) {
+      setViewingResults(null);
+      return;
+    }
+    const res = await fetch(`/api/prompts/${promptId}/responses`);
+    if (res.ok) {
+      setResultResponses(await res.json());
+      setViewingResults(promptId);
+    }
+  };
+
   if (notFound) {
     return (
       <main className="min-h-screen flex items-center justify-center">
@@ -121,103 +205,219 @@ export default function SessionPage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500">{session?.courseName}</p>
-            <h1 className="font-bold text-gray-800 text-sm leading-tight">
-              {session?.title ?? "読み込み中..."}
-            </h1>
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">{session?.courseName}</p>
+              <h1 className="font-bold text-gray-800 text-sm leading-tight">
+                {session?.title ?? "読み込み中..."}
+              </h1>
+            </div>
+            <span
+              className={`text-xs font-medium px-2 py-1 rounded-full ${
+                session?.isOpen
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {session?.isOpen ? "受付中" : "締切"}
+            </span>
           </div>
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded-full ${
-              session?.isOpen
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {session?.isOpen ? "受付中" : "締切"}
-          </span>
+
+          {/* タブ切替 */}
+          <div className="flex gap-1 mt-2">
+            <button
+              onClick={() => setTab("questions")}
+              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                tab === "questions"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              質問
+            </button>
+            <button
+              onClick={() => setTab("prompts")}
+              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                tab === "prompts"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              ディスカッション
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-        {/* 質問投稿フォーム */}
-        {session?.isOpen && (
-          <div className="bg-white rounded-2xl shadow-sm border p-4">
-            <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="質問を入力してください..."
-                rows={3}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                maxLength={500}
-              />
-              <div className="flex items-center gap-3 flex-wrap">
-                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={anonymous}
-                    onChange={(e) => setAnonymous(e.target.checked)}
-                    className="rounded"
+        {tab === "questions" ? (
+          <>
+            {/* 質問投稿フォーム */}
+            {session?.isOpen && (
+              <div className="bg-white rounded-2xl shadow-sm border p-4">
+                <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="質問を入力してください..."
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    maxLength={500}
                   />
-                  匿名で投稿
-                </label>
-                {!anonymous && (
-                  <input
-                    type="text"
-                    value={authorName}
-                    onChange={(e) => setAuthorName(e.target.value)}
-                    placeholder="名前（任意）"
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    maxLength={50}
-                  />
-                )}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={anonymous}
+                        onChange={(e) => setAnonymous(e.target.checked)}
+                        className="rounded"
+                      />
+                      匿名で投稿
+                    </label>
+                    {!anonymous && (
+                      <input
+                        type="text"
+                        value={authorName}
+                        onChange={(e) => setAuthorName(e.target.value)}
+                        placeholder="名前（任意）"
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        maxLength={50}
+                      />
+                    )}
+                  </div>
+                  {error && <p className="text-red-500 text-xs">{error}</p>}
+                  <button
+                    type="submit"
+                    disabled={submitting || !content.trim()}
+                    className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {submitting ? "投稿中..." : "質問を送信"}
+                  </button>
+                </form>
               </div>
-              {error && <p className="text-red-500 text-xs">{error}</p>}
-              <button
-                type="submit"
-                disabled={submitting || !content.trim()}
-                className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {submitting ? "投稿中..." : "質問を送信"}
-              </button>
-            </form>
-          </div>
-        )}
+            )}
 
-        {/* ソート切替 */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">{questions.length} 件の質問</span>
-          <div className="flex gap-1">
-            {(["time", "likes"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSort(s)}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  sort === s
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {s === "time" ? "新着順" : "いいね順"}
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* ソート切替 */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">{questions.length} 件の質問</span>
+              <div className="flex gap-1">
+                {(["time", "likes"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSort(s)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      sort === s
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s === "time" ? "新着順" : "いいね順"}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* 質問一覧 */}
-        {questions.length === 0 ? (
-          <div className="text-center text-gray-400 py-12 text-sm">
-            まだ質問がありません
-          </div>
+            {/* 質問一覧 */}
+            {questions.length === 0 ? (
+              <div className="text-center text-gray-400 py-12 text-sm">
+                まだ質問がありません
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {questions.map((q) => (
+                  <QuestionCard key={q.id} question={q} />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="space-y-3">
-            {questions.map((q) => (
-              <QuestionCard key={q.id} question={q} />
-            ))}
-          </div>
+          <>
+            {/* ディスカッション問題一覧 */}
+            {promptList.length === 0 ? (
+              <div className="text-center text-gray-400 py-12 text-sm">
+                まだ問題がありません
+              </div>
+            ) : (
+              promptList.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+                  <p className="text-sm text-gray-800 leading-relaxed font-medium">{p.content}</p>
+
+                  {/* 回答フォーム */}
+                  {session?.isOpen && (
+                    <div className="space-y-2">
+                      <textarea
+                        value={answerInputs[p.id] ?? ""}
+                        onChange={(e) =>
+                          setAnswerInputs((prev) => ({ ...prev, [p.id]: e.target.value }))
+                        }
+                        placeholder="あなたの回答を入力..."
+                        rows={2}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        maxLength={500}
+                      />
+                      <div className="flex items-center justify-between">
+                        {p.myAnswer && (
+                          <span className="text-xs text-green-600">回答済み（再送信で上書き）</span>
+                        )}
+                        <button
+                          onClick={() => submitAnswer(p.id)}
+                          disabled={
+                            submittingPromptId === p.id ||
+                            !(answerInputs[p.id]?.trim())
+                          }
+                          className="text-xs px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 ml-auto"
+                        >
+                          {submittingPromptId === p.id
+                            ? "送信中..."
+                            : p.myAnswer
+                            ? "回答を更新"
+                            : "回答を送信"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 結果表示 */}
+                  {p.isResultsVisible && (
+                    <div className="border-t pt-2">
+                      <button
+                        onClick={() => viewResults(p.id)}
+                        className="text-xs text-purple-500 hover:text-purple-700"
+                      >
+                        {viewingResults === p.id
+                          ? "結果を閉じる"
+                          : `みんなの回答を見る (${p.responseCount}件)`}
+                      </button>
+                      {viewingResults === p.id && (
+                        <div className="mt-2 space-y-1">
+                          {resultResponses.length === 0 ? (
+                            <p className="text-xs text-gray-400">まだ回答がありません</p>
+                          ) : (
+                            resultResponses.map((r) => (
+                              <div
+                                key={r.id}
+                                className="bg-purple-50 rounded-xl px-3 py-2 text-xs text-purple-800"
+                              >
+                                {r.answer}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!p.isResultsVisible && (
+                    <p className="text-xs text-gray-400 border-t pt-2">
+                      結果は教員が公開するまで見られません
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </>
         )}
       </div>
     </main>
