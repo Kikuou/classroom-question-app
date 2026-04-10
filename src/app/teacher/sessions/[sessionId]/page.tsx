@@ -44,6 +44,7 @@ interface SessionInfo {
   isOpen: boolean;
   courseName: string;
   courseId: number;
+  promptDescription: string | null;
 }
 
 const POLL_INTERVAL = 3000;
@@ -74,11 +75,21 @@ export default function TeacherSessionPage() {
   const promptDragItem = useRef<number | null>(null);
   const promptDragOver = useRef<number | null>(null);
 
+  // === 全体説明 state ===
+  const [descInput, setDescInput] = useState("");
+  const [descEditing, setDescEditing] = useState(false);
+  const [descSaving, setDescSaving] = useState(false);
+
   // === セッション情報取得 ===
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}`)
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => data && setSession(data));
+      .then((data) => {
+        if (data) {
+          setSession(data);
+          setDescInput(data.promptDescription ?? "");
+        }
+      });
   }, [sessionId]);
 
   // === 質問取得 ===
@@ -182,6 +193,25 @@ export default function TeacherSessionPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderedIds: reordered.map((q) => q.id) }),
     });
+  };
+
+  // === 全体説明保存 ===
+  const saveDescription = async () => {
+    setDescSaving(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promptDescription: descInput }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSession((s) => s ? { ...s, promptDescription: updated.promptDescription } : s);
+        setDescEditing(false);
+      }
+    } finally {
+      setDescSaving(false);
+    }
   };
 
   // === プロンプト操作 ===
@@ -396,6 +426,57 @@ export default function TeacherSessionPage() {
           </>
         ) : (
           <>
+            {/* 全体説明カード */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-amber-800">全体説明（学生に表示）</h2>
+                {!descEditing && (
+                  <button
+                    onClick={() => {
+                      setDescInput(session?.promptDescription ?? "");
+                      setDescEditing(true);
+                    }}
+                    className="text-xs text-amber-600 hover:text-amber-800 underline"
+                  >
+                    {session?.promptDescription ? "編集" : "+ 追加"}
+                  </button>
+                )}
+              </div>
+              {descEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={descInput}
+                    onChange={(e) => setDescInput(e.target.value)}
+                    placeholder="例: 今日は有機化合物の構造について考えます。各問いに自分の言葉で答えてください。"
+                    rows={4}
+                    className="w-full border border-amber-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                    maxLength={1000}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setDescEditing(false)}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={saveDescription}
+                      disabled={descSaving}
+                      className="text-xs px-4 py-1.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {descSaving ? "保存中..." : "保存"}
+                    </button>
+                  </div>
+                </div>
+              ) : session?.promptDescription ? (
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
+                  {session.promptDescription}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-500">未設定（設定すると学生の問題一覧上部に表示されます）</p>
+              )}
+            </div>
+
             {/* プロンプト作成フォーム */}
             <form onSubmit={createPrompt} className="bg-white rounded-2xl shadow-sm border p-4">
               <h2 className="font-semibold text-gray-700 mb-3 text-sm">新しい問題を追加</h2>

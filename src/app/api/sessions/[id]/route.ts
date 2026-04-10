@@ -19,6 +19,7 @@ export async function GET(
       courseId: sessions.courseId,
       courseName: courses.name,
       courseCode: courses.code,
+      promptDescription: sessions.promptDescription,
       createdAt: sessions.createdAt,
     })
     .from(sessions)
@@ -40,9 +41,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json();
-  const updateData: Partial<{ isOpen: boolean; title: string }> = {};
+  const updateData: Partial<{ isOpen: boolean; title: string; promptDescription: string | null }> = {};
   if (typeof body.isOpen === "boolean") updateData.isOpen = body.isOpen;
   if (typeof body.title === "string" && body.title.trim()) updateData.title = body.title.trim();
+  if ("promptDescription" in body) {
+    updateData.promptDescription =
+      typeof body.promptDescription === "string" && body.promptDescription.trim()
+        ? body.promptDescription.trim()
+        : null;
+  }
 
   const [session] = await db
     .update(sessions)

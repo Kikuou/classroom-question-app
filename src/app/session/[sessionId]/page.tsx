@@ -42,6 +42,7 @@ interface SessionInfo {
   title: string;
   isOpen: boolean;
   courseName: string;
+  promptDescription: string | null;
 }
 
 const POLL_INTERVAL = 5000;
@@ -334,6 +335,16 @@ export default function SessionPage() {
           </>
         ) : (
           <>
+            {/* 全体説明（設定されている場合のみ表示） */}
+            {session?.promptDescription && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-amber-700 mb-1">説明</p>
+                <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
+                  {session.promptDescription}
+                </p>
+              </div>
+            )}
+
             {/* ディスカッション問題一覧 */}
             {promptList.length === 0 ? (
               <div className="text-center text-gray-400 py-12 text-sm">
