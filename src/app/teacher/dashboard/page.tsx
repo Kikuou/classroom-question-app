@@ -44,6 +44,12 @@ export default function TeacherDashboardPage() {
     }
   };
 
+  const deleteCourse = async (courseId: number, courseName: string) => {
+    if (!confirm(`「${courseName}」を削除しますか？\nセッションと質問データもすべて削除されます。`)) return;
+    const res = await fetch(`/api/courses/${courseId}`, { method: "DELETE" });
+    if (res.ok) setCourses((prev) => prev.filter((c) => c.id !== courseId));
+  };
+
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPw.length < 4) return;
@@ -160,12 +166,18 @@ export default function TeacherDashboardPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-3">
+                  <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => router.push(`/teacher/courses/${c.id}`)}
                       className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                     >
                       セッション管理
+                    </button>
+                    <button
+                      onClick={() => deleteCourse(c.id, c.name)}
+                      className="text-xs px-3 py-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      削除
                     </button>
                   </div>
                 </div>

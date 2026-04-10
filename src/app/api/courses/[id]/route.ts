@@ -50,3 +50,18 @@ export async function PATCH(
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(course);
 }
+
+// 授業削除（セッション・質問もカスケード削除）
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    await requireTeacher();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await db.delete(courses).where(eq(courses.id, parseInt(id)));
+  return NextResponse.json({ ok: true });
+}
