@@ -29,6 +29,14 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // グローバルセッション作成
+  const [showGlobalForm, setShowGlobalForm] = useState(false);
+  const [globalCourseId, setGlobalCourseId] = useState<number | "">("");
+  const [globalTitle, setGlobalTitle] = useState("");
+  const [globalCreating, setGlobalCreating] = useState(false);
+  const [globalError, setGlobalError] = useState("");
+  const globalTitleRef = useRef<HTMLInputElement>(null);
+
   // パスワード変更
   const [showPwForm, setShowPwForm] = useState(false);
   const [newPw, setNewPw] = useState("");
@@ -155,20 +163,52 @@ export default function TeacherDashboardPage() {
     }
   };
 
+  // グローバルセッション作成フォームを開く
+  const openGlobalForm = () => {
+    setGlobalCourseId(courses.length === 1 ? courses[0].id : "");
+    setGlobalTitle("");
+    setGlobalError("");
+    setShowGlobalForm(true);
+    setShowPwForm(false);
+    setTimeout(() => globalTitleRef.current?.focus(), 50);
+  };
+
+  const submitGlobalSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!globalTitle.trim() || globalCourseId === "") return;
+    setGlobalCreating(true);
+    setGlobalError("");
+    const ok = await createSession(Number(globalCourseId), globalTitle.trim());
+    setGlobalCreating(false);
+    if (ok) {
+      setShowGlobalForm(false);
+      setGlobalTitle("");
+      setGlobalCourseId("");
+    } else {
+      setGlobalError("作成に失敗しました");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <h1 className="font-bold text-gray-800 text-base">授業一覧</h1>
           <div className="flex items-center gap-3">
+            <button
+              onClick={openGlobalForm}
+              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + セッション作成
+            </button>
             <a
               href="/teacher/courses/new"
-              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
             >
               + 新規授業
             </a>
             <button
-              onClick={() => { setShowPwForm((v) => !v); setPwMsg(""); }}
+              onClick={() => { setShowPwForm((v) => !v); setPwMsg(""); setShowGlobalForm(false); }}
               className="text-xs text-gray-400 hover:text-gray-600"
             >
               PW変更
@@ -178,6 +218,49 @@ export default function TeacherDashboardPage() {
             </button>
           </div>
         </div>
+        {showGlobalForm && (
+          <div className="max-w-2xl mx-auto mt-2 pb-2">
+            <form onSubmit={submitGlobalSession} className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={globalCourseId}
+                  onChange={(e) => setGlobalCourseId(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="">授業を選択...</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <input
+                  ref={globalTitleRef}
+                  type="text"
+                  value={globalTitle}
+                  onChange={(e) => setGlobalTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && setShowGlobalForm(false)}
+                  placeholder="セッション名（例: 第3回 官能基反応）"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  maxLength={100}
+                />
+                <button
+                  type="submit"
+                  disabled={globalCreating || !globalTitle.trim() || globalCourseId === ""}
+                  className="text-xs px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                >
+                  {globalCreating ? "作成中..." : "作成"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGlobalForm(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                >
+                  閉じる
+                </button>
+              </div>
+              {globalError && <p className="text-xs text-red-500">{globalError}</p>}
+            </form>
+          </div>
+        )}
         {showPwForm && (
           <div className="max-w-2xl mx-auto mt-2 pb-2">
             <form onSubmit={changePassword} className="flex items-center gap-2">

@@ -12,7 +12,6 @@ interface SessionItem {
 interface CourseInfo {
   id: number;
   name: string;
-  code: string;
 }
 
 export default function CourseSessionsPage() {

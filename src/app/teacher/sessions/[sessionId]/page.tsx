@@ -473,8 +473,8 @@ export default function TeacherSessionPage() {
             </div>
           </div>
 
-          {/* タブ切替 */}
-          <div className="flex gap-1 mt-2">
+          {/* タブ切替 + プレビューリンク */}
+          <div className="flex items-center gap-1 mt-2">
             <button
               onClick={() => setTab("questions")}
               className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
@@ -495,6 +495,14 @@ export default function TeacherSessionPage() {
             >
               ディスカッション問題
             </button>
+            <a
+              href={`/session/${sessionId}?preview=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5 whitespace-nowrap"
+            >
+              👁 学生画面を確認
+            </a>
           </div>
         </div>
       </header>

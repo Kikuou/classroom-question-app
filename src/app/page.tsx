@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 interface CourseItem {
   id: number;
   name: string;
-  code: string;
 }
 
 export default function HomePage() {
@@ -60,7 +59,6 @@ export default function HomePage() {
                   className="w-full text-left px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors shadow-sm"
                 >
                   <p className="font-medium text-gray-800 text-sm">{c.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 font-mono">{c.code}</p>
                 </button>
               </li>
             ))}

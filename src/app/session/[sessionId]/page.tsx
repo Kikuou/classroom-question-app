@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getClientId } from "@/lib/client-id";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LikeButton } from "@/components/LikeButton";
@@ -54,6 +54,8 @@ const POLL_INTERVAL = 5000;
 
 export default function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const searchParams = useSearchParams();
+  const isPreview = searchParams.get("preview") === "true";
   const router = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [tab, setTab] = useState<"questions" | "prompts">("questions");
@@ -317,19 +319,33 @@ export default function SessionPage() {
         </div>
       )}
 
+      {/* プレビューモードバナー */}
+      {isPreview && (
+        <div className="sticky top-0 z-20 bg-amber-400 text-amber-900 text-xs font-medium text-center py-1.5 px-4">
+          👁 プレビューモード — 教員による表示確認用です。質問・回答の送信は無効化されています。
+        </div>
+      )}
+
       <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
         <div className="max-w-2xl mx-auto">
           {/* ← 戻るボタン（スマホでも押しやすい位置） */}
-          <button
-            onClick={() =>
-              session?.courseId
-                ? router.push(`/courses/${session.courseId}`)
-                : router.push("/")
-            }
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-1.5 -ml-1 px-1 py-0.5"
-          >
-            ← {session?.courseName ?? "授業一覧"}に戻る
-          </button>
+          {!isPreview && (
+            <button
+              onClick={() =>
+                session?.courseId
+                  ? router.push(`/courses/${session.courseId}`)
+                  : router.push("/")
+              }
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-1.5 -ml-1 px-1 py-0.5"
+            >
+              ← {session?.courseName ?? "授業一覧"}に戻る
+            </button>
+          )}
+          {isPreview && (
+            <p className="text-xs text-amber-700 font-medium mb-1.5">
+              ← 学生からの見え方（プレビュー）
+            </p>
+          )}
 
           <div className="flex items-start justify-between gap-2">
             <h1 className="font-bold text-gray-800 text-sm leading-tight flex-1">
@@ -386,8 +402,12 @@ export default function SessionPage() {
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
         {tab === "questions" ? (
           <>
-            {/* 質問投稿フォーム or 締切メッセージ */}
-            {session?.isOpen ? (
+            {/* 質問投稿フォーム or 締切 or プレビュー */}
+            {isPreview ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-700 text-center">
+                プレビューモード — 質問フォームは表示されません（送信不可）
+              </div>
+            ) : session?.isOpen ? (
               <div className="bg-white rounded-2xl shadow-sm border p-4">
                 <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
@@ -504,69 +524,79 @@ export default function SessionPage() {
                   <p className="text-xs text-gray-400 font-medium">Q{qi + 1}</p>
                   <p className="text-sm text-gray-800 leading-relaxed font-medium">{p.content}</p>
 
-                  {/* 回答フォーム（受付中のみ入力可） */}
-                  <div className="space-y-2">
-                    <textarea
-                      value={answerInputs[p.id] ?? ""}
-                      onCompositionStart={() => { isComposingRef.current = true; }}
-                      onCompositionEnd={(e) => {
-                        isComposingRef.current = false;
-                        userEditedRef.current.add(p.id);
-                        setAnswerInputs((prev) => ({
-                          ...prev,
-                          [p.id]: (e.target as HTMLTextAreaElement).value,
-                        }));
-                      }}
-                      onChange={(e) => {
-                        if (!session?.discussionOpen) return;
-                        userEditedRef.current.add(p.id);
-                        setAnswerInputs((prev) => ({ ...prev, [p.id]: e.target.value }));
-                      }}
-                      placeholder={
-                        session?.discussionOpen
-                          ? "あなたの回答を入力..."
-                          : "回答受付は終了しました"
-                      }
-                      rows={3}
-                      disabled={!session?.discussionOpen}
-                      className={`w-full border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none transition-colors ${
-                        session?.discussionOpen
-                          ? "border-gray-300 focus:ring-2 focus:ring-purple-400 bg-white"
-                          : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
-                      }`}
-                      maxLength={500}
-                    />
-                    {session?.discussionOpen ? (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-gray-400">
-                          {answerInputs[p.id]?.length ?? 0} / 500
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {p.myAnswer && (
-                            <span className="text-xs text-green-600">回答済み</span>
-                          )}
-                          <button
-                            onClick={() => submitAnswer(p.id)}
-                            disabled={
-                              submittingPromptId === p.id ||
-                              !(answerInputs[p.id]?.trim())
-                            }
-                            className="text-sm px-5 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 font-medium"
-                          >
-                            {submittingPromptId === p.id
-                              ? "送信中..."
-                              : p.myAnswer
-                              ? "回答を更新"
-                              : "回答する"}
-                          </button>
-                        </div>
+                  {/* 回答フォーム（受付中のみ入力可。プレビュー時は常に無効） */}
+                  {(() => {
+                    const canAnswer = !isPreview && (session?.discussionOpen ?? false);
+                    return (
+                      <div className="space-y-2">
+                        <textarea
+                          value={answerInputs[p.id] ?? ""}
+                          onCompositionStart={() => { isComposingRef.current = true; }}
+                          onCompositionEnd={(e) => {
+                            isComposingRef.current = false;
+                            if (!canAnswer) return;
+                            userEditedRef.current.add(p.id);
+                            setAnswerInputs((prev) => ({
+                              ...prev,
+                              [p.id]: (e.target as HTMLTextAreaElement).value,
+                            }));
+                          }}
+                          onChange={(e) => {
+                            if (!canAnswer) return;
+                            userEditedRef.current.add(p.id);
+                            setAnswerInputs((prev) => ({ ...prev, [p.id]: e.target.value }));
+                          }}
+                          placeholder={
+                            isPreview
+                              ? "（プレビューモード — 回答不可）"
+                              : session?.discussionOpen
+                              ? "あなたの回答を入力..."
+                              : "回答受付は終了しました"
+                          }
+                          rows={3}
+                          disabled={!canAnswer}
+                          className={`w-full border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none transition-colors ${
+                            canAnswer
+                              ? "border-gray-300 focus:ring-2 focus:ring-purple-400 bg-white"
+                              : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                          }`}
+                          maxLength={500}
+                        />
+                        {canAnswer ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-gray-400">
+                              {answerInputs[p.id]?.length ?? 0} / 500
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {p.myAnswer && (
+                                <span className="text-xs text-green-600">回答済み</span>
+                              )}
+                              <button
+                                onClick={() => submitAnswer(p.id)}
+                                disabled={
+                                  submittingPromptId === p.id ||
+                                  !(answerInputs[p.id]?.trim())
+                                }
+                                className="text-sm px-5 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 font-medium"
+                              >
+                                {submittingPromptId === p.id
+                                  ? "送信中..."
+                                  : p.myAnswer
+                                  ? "回答を更新"
+                                  : "回答する"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 text-center py-1">
+                            {isPreview
+                              ? "プレビューモード — 回答送信は無効化されています"
+                              : "回答受付は終了しました。みんなの回答は引き続き閲覧できます。"}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 text-center py-1">
-                        回答受付は終了しました。みんなの回答は引き続き閲覧できます。
-                      </p>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* 結果表示 */}
                   {p.isResultsVisible ? (
