@@ -256,11 +256,11 @@ export default function SessionPage() {
           <p className="text-gray-500 text-sm mt-2">{serverError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 text-sm px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900"
+            className="mt-4 text-sm px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
           >
             再読み込み
           </button>
-          <a href="/" className="text-blue-500 underline mt-3 block text-sm">トップに戻る</a>
+          <a href="/" className="text-indigo-500 underline mt-3 block text-sm">トップに戻る</a>
         </div>
       </main>
     );
@@ -271,7 +271,7 @@ export default function SessionPage() {
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500">セッションが見つかりません</p>
-          <a href="/" className="text-blue-500 underline mt-2 block">トップに戻る</a>
+          <a href="/" className="text-indigo-500 underline mt-2 block">トップに戻る</a>
         </div>
       </main>
     );
@@ -288,7 +288,7 @@ export default function SessionPage() {
                 <h2 className="font-bold text-gray-800">全問の回答一覧</h2>
                 <button
                   onClick={() => setShowOverview(false)}
-                  className="text-sm px-4 py-2 bg-gray-800 text-white rounded-xl"
+                  className="text-sm px-4 py-2 bg-gray-800 text-white rounded-lg"
                 >
                   閉じる
                 </button>
@@ -298,7 +298,7 @@ export default function SessionPage() {
               ) : (
                 <div className="space-y-6">
                   {overviewData.map((p, qi) => (
-                    <div key={p.id} className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+                    <div key={p.id} className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
                       <p className="text-xs text-gray-400 font-medium">Q{qi + 1}</p>
                       <p className="text-sm font-medium text-gray-800 leading-relaxed">{p.content}</p>
                       <div className="border-t pt-3">
@@ -307,7 +307,7 @@ export default function SessionPage() {
                         ) : (
                           <div className="space-y-1.5">
                             {p.responses.map((r) => (
-                              <div key={r.id} className="bg-purple-50 rounded-xl px-3 py-2 text-sm text-purple-800">
+                              <div key={r.id} className="bg-indigo-50 rounded-lg px-3 py-2 text-sm text-indigo-800">
                                 {r.answer}
                               </div>
                             ))}
@@ -378,23 +378,23 @@ export default function SessionPage() {
           </div>
 
           {/* タブ切替 */}
-          <div className="flex gap-1 mt-2">
+          <div className="flex gap-6 border-b border-gray-200 mt-2">
             <button
               onClick={() => setTab("questions")}
-              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+              className={`text-sm pb-2 font-medium border-b-2 transition-colors ${
                 tab === "questions"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               質問
             </button>
             <button
               onClick={() => setTab("prompts")}
-              className={`text-xs px-4 py-1.5 rounded-lg font-medium transition-colors ${
+              className={`text-sm pb-2 font-medium border-b-2 transition-colors ${
                 tab === "prompts"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               ディスカッション
@@ -408,19 +408,19 @@ export default function SessionPage() {
           <>
             {/* 質問投稿フォーム or 締切 or プレビュー */}
             {isPreview ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-700 text-center">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700 text-center">
                 プレビューモード — 質問フォームは表示されません（送信不可）
               </div>
             ) : session?.isOpen ? (
-              <div className="bg-white rounded-2xl shadow-sm border p-4">
+              <div className="bg-white rounded-lg shadow-sm border p-4">
                 <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="質問を入力してください..."
-                    rows={3}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    rows={4}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
                     maxLength={500}
                   />
                   <div className="flex items-center gap-3 flex-wrap">
@@ -439,7 +439,7 @@ export default function SessionPage() {
                         value={authorName}
                         onChange={(e) => setAuthorName(e.target.value)}
                         placeholder="名前（任意）"
-                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
                         maxLength={50}
                       />
                     )}
@@ -448,14 +448,14 @@ export default function SessionPage() {
                   <button
                     type="submit"
                     disabled={submitting || !content.trim()}
-                    className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                   >
                     {submitting ? "投稿中..." : "質問を送信"}
                   </button>
                 </form>
               </div>
             ) : session !== null ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-500 text-center">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-500 text-center">
                 この回の質問受付は終了しました。<br />
                 <span className="text-xs text-gray-400">投稿済みの質問と教員の返信は引き続き閲覧できます。</span>
               </div>
@@ -471,7 +471,7 @@ export default function SessionPage() {
                     onClick={() => setSort(s)}
                     className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                       sort === s
-                        ? "bg-blue-600 text-white"
+                        ? "bg-indigo-600 text-white"
                         : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                     }`}
                   >
@@ -498,7 +498,7 @@ export default function SessionPage() {
           <>
             {/* 全体説明（設定されている場合のみ表示） */}
             {session?.promptDescription && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                 <p className="text-xs font-semibold text-amber-700 mb-1">説明</p>
                 <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
                   {session.promptDescription}
@@ -511,7 +511,7 @@ export default function SessionPage() {
               <button
                 onClick={loadOverview}
                 disabled={overviewLoading}
-                className="w-full py-2.5 rounded-xl border border-purple-300 bg-purple-50 text-purple-700 text-sm font-medium hover:bg-purple-100 disabled:opacity-50 transition-colors"
+                className="w-full py-2.5 rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 disabled:opacity-50 transition-colors"
               >
                 {overviewLoading ? "読み込み中..." : "📋 全問の回答をまとめて見る"}
               </button>
@@ -524,7 +524,7 @@ export default function SessionPage() {
               </div>
             ) : (
               promptList.map((p, qi) => (
-                <div key={p.id} className="bg-white rounded-2xl shadow-sm border p-4 space-y-3">
+                <div key={p.id} className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
                   <p className="text-xs text-gray-400 font-medium">Q{qi + 1}</p>
                   <p className="text-sm text-gray-800 leading-relaxed font-medium">{p.content}</p>
 
@@ -559,9 +559,9 @@ export default function SessionPage() {
                           }
                           rows={3}
                           disabled={!canAnswer}
-                          className={`w-full border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none transition-colors ${
+                          className={`w-full border rounded-lg px-4 py-3 text-sm resize-none focus:outline-none transition-colors ${
                             canAnswer
-                              ? "border-gray-300 focus:ring-2 focus:ring-purple-400 bg-white"
+                              ? "border-gray-300 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 bg-white"
                               : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                           }`}
                           maxLength={500}
@@ -581,7 +581,7 @@ export default function SessionPage() {
                                   submittingPromptId === p.id ||
                                   !(answerInputs[p.id]?.trim())
                                 }
-                                className="text-sm px-5 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 font-medium"
+                                className="text-sm px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
                               >
                                 {submittingPromptId === p.id
                                   ? "送信中..."
@@ -607,7 +607,7 @@ export default function SessionPage() {
                     <div className="border-t pt-2">
                       <button
                         onClick={() => viewResults(p.id)}
-                        className="text-xs text-purple-500 hover:text-purple-700"
+                        className="text-xs text-indigo-500 hover:text-indigo-700"
                       >
                         {viewingResults === p.id
                           ? "結果を閉じる"
@@ -621,7 +621,7 @@ export default function SessionPage() {
                             resultResponses.map((r) => (
                               <div
                                 key={r.id}
-                                className="bg-purple-50 rounded-xl px-3 py-2 text-sm text-purple-800"
+                                className="bg-indigo-50 rounded-lg px-3 py-2 text-sm text-indigo-800"
                               >
                                 {r.answer}
                               </div>
@@ -656,7 +656,7 @@ function QuestionCard({ question }: { question: Question }) {
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border p-4 space-y-2">
+    <div className="bg-white rounded-lg shadow-sm border p-4 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-gray-800 leading-relaxed flex-1">{question.content}</p>
         <StatusBadge status={question.status} />
@@ -673,14 +673,14 @@ function QuestionCard({ question }: { question: Question }) {
         <div className="mt-2 border-t pt-2">
           <button
             onClick={() => setShowReplies((v) => !v)}
-            className="text-xs text-blue-500 mb-1"
+            className="text-xs text-indigo-500 mb-1"
           >
             {showReplies ? "返信を隠す" : `返信を見る (${question.replies.length})`}
           </button>
           {showReplies &&
             question.replies.map((r) => (
-              <div key={r.id} className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-800 mt-1">
-                <span className="font-medium text-blue-600 mr-1">教員:</span>
+              <div key={r.id} className="bg-indigo-50 rounded-lg px-3 py-2 text-xs text-indigo-800 mt-1">
+                <span className="font-medium text-indigo-600 mr-1">教員:</span>
                 {r.content}
               </div>
             ))}

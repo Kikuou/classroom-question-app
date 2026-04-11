@@ -197,7 +197,7 @@ export default function TeacherDashboardPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={openGlobalForm}
-              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
               + セッション作成
             </button>
@@ -225,7 +225,7 @@ export default function TeacherDashboardPage() {
                 <select
                   value={globalCourseId}
                   onChange={(e) => setGlobalCourseId(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
                 >
                   <option value="">授業を選択...</option>
                   {courses.map((c) => (
@@ -239,13 +239,13 @@ export default function TeacherDashboardPage() {
                   onChange={(e) => setGlobalTitle(e.target.value)}
                   onKeyDown={(e) => e.key === "Escape" && setShowGlobalForm(false)}
                   placeholder="セッション名（例: 第3回 官能基反応）"
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   maxLength={100}
                 />
                 <button
                   type="submit"
                   disabled={globalCreating || !globalTitle.trim() || globalCourseId === ""}
-                  className="text-xs px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                  className="text-xs px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 shrink-0"
                 >
                   {globalCreating ? "作成中..." : "作成"}
                 </button>
@@ -269,7 +269,7 @@ export default function TeacherDashboardPage() {
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
                 placeholder="新しいパスワード（4文字以上）"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 autoFocus
               />
               <button
@@ -305,7 +305,7 @@ export default function TeacherDashboardPage() {
             <p className="text-gray-400 text-sm mb-4">まだ授業がありません</p>
             <a
               href="/teacher/courses/new"
-              className="inline-block px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+              className="inline-block px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700"
             >
               最初の授業を作成
             </a>
@@ -363,7 +363,7 @@ function CourseCard({
   const hasMore = course.sessions.length > SESSION_PREVIEW;
 
   return (
-    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+    <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
       {/* 授業ヘッダー */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start gap-2">
@@ -385,7 +385,7 @@ function CourseCard({
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {course.pendingCount > 0 && (
-              <span className="text-xs bg-yellow-100 text-yellow-700 font-medium px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-full">
                 未対応 {course.pendingCount}
               </span>
             )}
@@ -425,7 +425,7 @@ function CourseCard({
           {hasMore && !showAll && (
             <button
               onClick={() => setShowAll(true)}
-              className="w-full text-xs text-blue-500 hover:text-blue-700 py-2 border-t bg-gray-50 hover:bg-blue-50 transition-colors"
+              className="w-full text-xs text-indigo-500 hover:text-indigo-700 py-2 border-t bg-gray-50 hover:bg-indigo-50 transition-colors"
             >
               残り {course.sessions.length - SESSION_PREVIEW} 件を表示
             </button>
@@ -571,7 +571,7 @@ function InlineEdit({
             if (e.key === "Escape") cancel();
           }}
           onBlur={save}
-          className="flex-1 min-w-0 border border-blue-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 min-w-0 border border-indigo-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
           maxLength={100}
         />
         <button
@@ -620,9 +620,9 @@ function StatusBadge({
   inactiveColor: "gray";
 }) {
   const colorMap = {
-    green: "bg-green-100 text-green-700",
-    orange: "bg-orange-100 text-orange-700",
-    blue: "bg-blue-100 text-blue-700",
+    green: "bg-emerald-100 text-emerald-800",
+    orange: "bg-amber-100 text-amber-800",
+    blue: "bg-indigo-100 text-indigo-700",
     gray: "bg-gray-100 text-gray-400",
   };
 
@@ -676,7 +676,7 @@ function NewSessionForm({
       <div className="flex items-center gap-2">
         <button
           onClick={() => setShowInput(true)}
-          className="text-xs text-blue-500 hover:text-blue-700 font-medium py-0.5"
+          className="text-xs text-indigo-500 hover:text-indigo-700 font-medium py-0.5"
         >
           + セッション追加
         </button>
@@ -700,13 +700,13 @@ function NewSessionForm({
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && setShowInput(false)}
           placeholder="セッション名を入力（例: 第1回 有機化学入門）"
-          className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200"
           maxLength={100}
         />
         <button
           type="submit"
           disabled={creating || !title.trim()}
-          className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           {creating ? "作成中..." : "作成"}
         </button>

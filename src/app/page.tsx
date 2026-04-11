@@ -122,11 +122,11 @@ export default function HomePage() {
                     {data!.active.map((d) => (
                       <div
                         key={d.sessionId}
-                        className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+                        className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-blue-600 font-medium">
+                            <p className="text-xs text-indigo-600 font-medium">
                               {d.courseName}　／　{d.sessionTitle}
                             </p>
                             <p className="text-xs text-emerald-600 mt-1">
@@ -142,7 +142,7 @@ export default function HomePage() {
                             onClick={() =>
                               router.push(`/session/${d.sessionId}?tab=discussion`)
                             }
-                            className="shrink-0 text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            className="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                           >
                             参加する
                           </button>
@@ -159,11 +159,11 @@ export default function HomePage() {
                     {data!.openQuestions.map((s) => (
                       <div
                         key={s.sessionId}
-                        className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+                        className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-blue-600 font-medium">
+                            <p className="text-xs text-indigo-600 font-medium">
                               {s.courseName}　／　{s.sessionTitle}
                             </p>
                             <p className="text-xs text-emerald-600 mt-1">
@@ -202,7 +202,7 @@ export default function HomePage() {
             {hasArchived && (
               <section>
                 <SectionHeading>アーカイブ（過去のディスカッション）</SectionHeading>
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
                   {data!.archived.map((course) => {
                     const expanded = expandedArchive.has(course.courseId);
                     return (
@@ -242,7 +242,7 @@ export default function HomePage() {
                                       `/session/${s.sessionId}?tab=discussion`
                                     )
                                   }
-                                  className="text-xs text-blue-500 hover:text-blue-700 shrink-0 ml-3 transition-colors"
+                                  className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0 ml-3 transition-colors"
                                 >
                                   見返す →
                                 </button>
@@ -266,7 +266,7 @@ export default function HomePage() {
                     <li key={c.id}>
                       <button
                         onClick={() => router.push(`/courses/${c.id}`)}
-                        className="w-full text-left px-4 py-2.5 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors shadow-sm"
+                        className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
                       >
                         <p className="text-sm text-gray-700">{c.name}</p>
                       </button>

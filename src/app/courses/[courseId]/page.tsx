@@ -53,7 +53,7 @@ export default function CourseSessionsPage() {
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500">授業が見つかりません</p>
-          <a href="/" className="text-blue-500 underline mt-2 block">トップに戻る</a>
+          <a href="/" className="text-indigo-500 underline mt-2 block">トップに戻る</a>
         </div>
       </main>
     );
@@ -66,11 +66,11 @@ export default function CourseSessionsPage() {
           <p className="text-red-500">{serverError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-3 text-sm px-4 py-2 bg-gray-800 text-white rounded-xl"
+            className="mt-3 text-sm px-4 py-2 bg-gray-800 text-white rounded-lg"
           >
             再読み込み
           </button>
-          <a href="/" className="text-blue-500 underline mt-3 block text-sm">トップに戻る</a>
+          <a href="/" className="text-indigo-500 underline mt-3 block text-sm">トップに戻る</a>
         </div>
       </main>
     );
@@ -109,9 +109,9 @@ export default function CourseSessionsPage() {
                 <button
                   onClick={() => s.isOpen && router.push(`/session/${s.id}`)}
                   disabled={!s.isOpen}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
                     s.isOpen
-                      ? "border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800"
+                      ? "border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900"
                       : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                   }`}
                 >
