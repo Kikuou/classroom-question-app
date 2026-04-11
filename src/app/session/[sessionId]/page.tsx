@@ -56,9 +56,13 @@ export default function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
   const isPreview = searchParams.get("preview") === "true";
+  // ?tab=discussion でディスカッションタブを自動選択
+  const tabParam = searchParams.get("tab");
   const router = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
-  const [tab, setTab] = useState<"questions" | "prompts">("questions");
+  const [tab, setTab] = useState<"questions" | "prompts">(
+    tabParam === "discussion" ? "prompts" : "questions"
+  );
   const [notFound, setNotFound] = useState(false);
   const [serverError, setServerError] = useState("");
 
