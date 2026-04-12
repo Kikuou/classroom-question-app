@@ -174,11 +174,19 @@ export async function GET() {
 
     const archived = Array.from(archivedMap.values());
 
+    // 「授業一覧」セクション用:
+    // 非削除セッションが1件以上ある授業のみ表示する
+    // （全セッションが削除済みの授業はナビゲーション先がないため除外）
+    const courseIdsWithSessions = new Set(allSessions.map((s) => s.courseId));
+    const filteredCourses = visibleCourses.filter((c) =>
+      courseIdsWithSessions.has(c.id)
+    );
+
     return NextResponse.json({
       active,
       openQuestions,
       archived,
-      courses: visibleCourses,
+      courses: filteredCourses,
     });
   } catch (e) {
     console.error("[GET /api/discussions]", e);

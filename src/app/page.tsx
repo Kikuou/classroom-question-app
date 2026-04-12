@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface ActiveDiscussion {
@@ -66,18 +66,47 @@ function HomePageInner() {
     router.replace(`/?mode=${newMode}`, { scroll: false });
   };
 
-  useEffect(() => {
-    fetch("/api/discussions")
-      .then(async (res) => {
-        if (!res.ok) { setError("読み込みに失敗しました"); return; }
-        const d: DiscussionsData = await res.json();
-        setData(d);
-        // デフォルトで全授業を展開
+  // データ取得（初回 + 再表示時に共通で使う）
+  const loadData = useCallback(async (initial: boolean = false) => {
+    if (initial) setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/discussions");
+      if (!res.ok) { setError("読み込みに失敗しました"); return; }
+      const d: DiscussionsData = await res.json();
+      setData(d);
+      if (initial) {
+        // 初回のみ全授業を展開
         setExpandedArchive(new Set(d.archived.map((a) => a.courseId)));
-      })
-      .catch(() => setError("通信エラーが発生しました"))
-      .finally(() => setLoading(false));
+      }
+    } catch {
+      setError("通信エラーが発生しました");
+    } finally {
+      if (initial) setLoading(false);
+    }
   }, []);
+
+  // 初回ロード
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
+
+  // タブ復帰・bfcache復元時に最新データを再取得
+  // （教員が削除・非公開にした内容を即時反映するため）
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    const handlePageshow = (e: PageTransitionEvent) => {
+      if (e.persisted) loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("pageshow", handlePageshow as EventListener);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("pageshow", handlePageshow as EventListener);
+    };
+  }, [loadData]);
 
   const toggleArchive = (courseId: number) => {
     setExpandedArchive((prev) => {
