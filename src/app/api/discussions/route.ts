@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { courses, sessions, prompts, questions } from "@/db/schema";
-import { eq, and, inArray, sql, asc, desc } from "drizzle-orm";
+import { eq, and, inArray, sql, asc, desc, ne } from "drizzle-orm";
 
 // Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 
 // 学生用: トップページ向けに実施中・質問受付中・アーカイブを一括返却
-export async function GET() {
+export async function GET(_req: Request) {
   try {
     // 1. 公開中の授業
     const visibleCourses = await db
@@ -25,8 +25,9 @@ export async function GET() {
     const courseIds = visibleCourses.map((c) => c.id);
     const courseMap = new Map(visibleCourses.map((c) => [c.id, c.name]));
 
-    // 2. 非削除セッション（全件、sortOrder ASC → createdAt ASC の回数順）
-    const allSessions = await db
+    // 2. 非削除セッション（全件、sortOrder ASC → createdAt ASC の順）
+    //    isDeleted を SELECT に含め、JS レベルでも二重フィルタする
+    const rawSessions = await db
       .select({
         id: sessions.id,
         courseId: sessions.courseId,
@@ -34,11 +35,29 @@ export async function GET() {
         isOpen: sessions.isOpen,
         discussionOpen: sessions.discussionOpen,
         sortOrder: sessions.sortOrder,
+        isDeleted: sessions.isDeleted,
         createdAt: sessions.createdAt,
       })
       .from(sessions)
-      .where(and(eq(sessions.isDeleted, false), inArray(sessions.courseId, courseIds)))
+      .where(
+        and(
+          eq(sessions.isDeleted, false),
+          ne(sessions.isDeleted, true),          // 二重フィルタ（念のため）
+          inArray(sessions.courseId, courseIds)
+        )
+      )
       .orderBy(asc(sessions.sortOrder), asc(sessions.createdAt));
+
+    // JS レベルでも削除済みを除外（DBフィルタの結果を検証しつつ保護）
+    const allSessions = rawSessions.filter((s) => s.isDeleted === false);
+
+    // デバッグログ: DB と JS フィルタの差を記録
+    if (rawSessions.length !== allSessions.length) {
+      console.warn(
+        `[discussions] DB filter missed ${rawSessions.length - allSessions.length} deleted sessions!`,
+        rawSessions.filter((s) => s.isDeleted !== false).map((s) => s.id)
+      );
+    }
 
     if (allSessions.length === 0) {
       return NextResponse.json({
@@ -181,7 +200,6 @@ export async function GET() {
 
     // 「授業一覧」セクション用:
     // 非削除セッションが1件以上ある授業のみ表示する
-    // （全セッションが削除済みの授業はナビゲーション先がないため除外）
     const courseIdsWithSessions = new Set(allSessions.map((s) => s.courseId));
     const filteredCourses = visibleCourses.filter((c) =>
       courseIdsWithSessions.has(c.id)
