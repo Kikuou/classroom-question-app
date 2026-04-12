@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface ActiveDiscussion {
   sessionId: number;
@@ -46,13 +46,25 @@ interface DiscussionsData {
   courses: CourseItem[];
 }
 
-export default function HomePage() {
+type Mode = "questions" | "discussion";
+
+// ─── メインコンポーネント（useSearchParams を使うため Suspense 内） ───
+
+function HomePageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mode: Mode = (searchParams.get("mode") as Mode) ?? "questions";
+
   const [data, setData] = useState<DiscussionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // アーカイブは授業ごとに折りたたみ（デフォルト展開）
+  // アーカイブ折りたたみ状態
   const [expandedArchive, setExpandedArchive] = useState<Set<number>>(new Set());
+
+  // タブ切替（URL を replace: ブラウザ履歴を汚さない）
+  const setMode = (newMode: Mode) => {
+    router.replace(`/?mode=${newMode}`, { scroll: false });
+  };
 
   useEffect(() => {
     fetch("/api/discussions")
@@ -76,15 +88,11 @@ export default function HomePage() {
     });
   };
 
-  const hasActive =
-    (data?.active.length ?? 0) > 0 || (data?.openQuestions.length ?? 0) > 0;
-  const hasArchived = (data?.archived.length ?? 0) > 0;
-
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white border-b px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
+      {/* ヘッダー + セグメントコントロール */}
+      <header className="bg-white border-b sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 pt-3 pb-0 flex items-center justify-between">
           <h1 className="font-bold text-gray-800 text-base">授業質問アプリ</h1>
           <a
             href="/teacher/login"
@@ -93,9 +101,35 @@ export default function HomePage() {
             教員ログイン
           </a>
         </div>
+
+        {/* iOS セグメントコントロール風タブ */}
+        <div className="max-w-lg mx-auto px-4 pt-3 pb-3">
+          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => setMode("questions")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === "questions"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              📝 質問
+            </button>
+            <button
+              onClick={() => setMode("discussion")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === "discussion"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              💬 ディスカッション
+            </button>
+          </div>
+        </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-8">
+      <div className="max-w-lg mx-auto px-4 py-5">
         {loading ? (
           <div className="text-center text-gray-400 py-16 text-sm">読み込み中...</div>
         ) : error ? (
@@ -108,181 +142,234 @@ export default function HomePage() {
               再読み込み
             </button>
           </div>
+        ) : mode === "questions" ? (
+          <QuestionsTab data={data!} router={router} />
         ) : (
-          <>
-            {/* ─── セクション1: いま参加できるもの ─── */}
-            {hasActive ? (
-              <section>
-                <SectionHeading>いま参加できるもの</SectionHeading>
-
-                {/* 実施中ディスカッション */}
-                {data!.active.length > 0 && (
-                  <div className="space-y-2.5 mb-4">
-                    <SubHeading>ディスカッション</SubHeading>
-                    {data!.active.map((d) => (
-                      <div
-                        key={d.sessionId}
-                        className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-indigo-600 font-medium">
-                              {d.courseName}　／　{d.sessionTitle}
-                            </p>
-                            <p className="text-xs text-emerald-600 mt-1">
-                              🟢 回答受付中（{d.promptCount}問）
-                            </p>
-                            {d.firstPromptPreview && (
-                              <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
-                                「{d.firstPromptPreview}…」
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() =>
-                              router.push(`/session/${d.sessionId}?tab=discussion`)
-                            }
-                            className="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                          >
-                            参加する
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* 質問受付中 */}
-                {data!.openQuestions.length > 0 && (
-                  <div className="space-y-2.5">
-                    <SubHeading>質問受付中</SubHeading>
-                    {data!.openQuestions.map((s) => (
-                      <div
-                        key={s.sessionId}
-                        className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-indigo-600 font-medium">
-                              {s.courseName}　／　{s.sessionTitle}
-                            </p>
-                            <p className="text-xs text-emerald-600 mt-1">
-                              🟢 質問受付中（{s.questionCount}件）
-                            </p>
-                            {s.latestQuestionPreview && (
-                              <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
-                                最新：「{s.latestQuestionPreview}…」
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => router.push(`/session/${s.sessionId}`)}
-                            className="shrink-0 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                          >
-                            質問する
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ) : (
-              /* どちらも0件 */
-              !hasArchived && (
-                <div className="text-center py-16">
-                  <p className="text-gray-400 text-sm">
-                    現在参加できるセッションはありません
-                  </p>
-                </div>
-              )
-            )}
-
-            {/* ─── セクション2: アーカイブ ─── */}
-            {hasArchived && (
-              <section>
-                <SectionHeading>アーカイブ（過去のディスカッション）</SectionHeading>
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
-                  {data!.archived.map((course) => {
-                    const expanded = expandedArchive.has(course.courseId);
-                    return (
-                      <div key={course.courseId}>
-                        {/* 授業見出し（折りたたみトグル） */}
-                        <button
-                          onClick={() => toggleArchive(course.courseId)}
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                        >
-                          <span className="text-sm font-semibold text-gray-800">
-                            {course.courseName}
-                          </span>
-                          <span className="text-gray-400 text-xs ml-2">
-                            {expanded ? "▾" : "▸"}
-                          </span>
-                        </button>
-
-                        {/* セッション一覧（回数順 sortOrder ASC） */}
-                        {expanded && (
-                          <ul className="border-t divide-y divide-gray-50 bg-gray-50">
-                            {course.sessions.map((s) => (
-                              <li
-                                key={s.sessionId}
-                                className="flex items-center justify-between px-5 py-2.5"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-sm text-gray-700 truncate">
-                                    {s.sessionTitle}
-                                  </span>
-                                  <span className="text-xs text-gray-400 shrink-0">
-                                    （{s.promptCount}問）
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    router.push(
-                                      `/session/${s.sessionId}?tab=discussion`
-                                    )
-                                  }
-                                  className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0 ml-3 transition-colors"
-                                >
-                                  見返す →
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* ─── セクション3: 授業一覧 ─── */}
-            {(data?.courses.length ?? 0) > 0 && (
-              <section>
-                <SectionHeading>授業一覧</SectionHeading>
-                <ul className="space-y-1.5">
-                  {data!.courses.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        onClick={() => router.push(`/courses/${c.id}`)}
-                        className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
-                      >
-                        <p className="text-sm text-gray-700">{c.name}</p>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </>
+          <DiscussionTab
+            data={data!}
+            router={router}
+            expandedArchive={expandedArchive}
+            toggleArchive={toggleArchive}
+          />
         )}
       </div>
     </main>
   );
 }
 
-// ─── 小コンポーネント ─────────────────────────────────
+// ─── 質問タブ ──────────────────────────────────────────────────
+
+function QuestionsTab({
+  data,
+  router,
+}: {
+  data: DiscussionsData;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const hasOpen = data.openQuestions.length > 0;
+
+  return (
+    <div className="space-y-6">
+      {/* 質問受付中セクション */}
+      <section>
+        <SectionHeading>質問受付中</SectionHeading>
+        {!hasOpen ? (
+          <div className="text-center py-10">
+            <p className="text-gray-400 text-sm">
+              現在、質問受付中のセッションはありません
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {data.openQuestions.map((s) => (
+              <div
+                key={s.sessionId}
+                className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-indigo-600">
+                      {s.courseName}　／　{s.sessionTitle}
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      🟢 質問受付中（{s.questionCount}件）
+                    </p>
+                    {s.latestQuestionPreview && (
+                      <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
+                        最新：「{s.latestQuestionPreview}…」
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => router.push(`/session/${s.sessionId}`)}
+                    className="shrink-0 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                  >
+                    質問する
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 授業一覧（過去回へのナビゲーション） */}
+      {data.courses.length > 0 && (
+        <section>
+          <SectionHeading>授業一覧</SectionHeading>
+          <ul className="space-y-1.5">
+            {data.courses.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => router.push(`/courses/${c.id}`)}
+                  className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
+                >
+                  <p className="text-sm text-gray-700">{c.name}</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─── ディスカッションタブ ───────────────────────────────────────
+
+function DiscussionTab({
+  data,
+  router,
+  expandedArchive,
+  toggleArchive,
+}: {
+  data: DiscussionsData;
+  router: ReturnType<typeof useRouter>;
+  expandedArchive: Set<number>;
+  toggleArchive: (courseId: number) => void;
+}) {
+  const hasActive = data.active.length > 0;
+  const hasArchived = data.archived.length > 0;
+
+  return (
+    <div className="space-y-6">
+      {/* 実施中ディスカッション */}
+      <section>
+        <SectionHeading>実施中のディスカッション</SectionHeading>
+        {!hasActive ? (
+          <div className="text-center py-10">
+            <p className="text-gray-400 text-sm">
+              現在、実施中のディスカッションはありません
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {data.active.map((d) => (
+              <div
+                key={d.sessionId}
+                className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-indigo-600">
+                      {d.courseName}　／　{d.sessionTitle}
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      🟢 回答受付中（{d.promptCount}問）
+                    </p>
+                    {d.firstPromptPreview && (
+                      <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
+                        「{d.firstPromptPreview}…」
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() =>
+                      router.push(`/session/${d.sessionId}?tab=discussion`)
+                    }
+                    className="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                  >
+                    参加する
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* アーカイブ */}
+      {hasArchived && (
+        <section>
+          <SectionHeading>アーカイブ（終了したディスカッション）</SectionHeading>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+            {data.archived.map((course) => {
+              const expanded = expandedArchive.has(course.courseId);
+              return (
+                <div key={course.courseId}>
+                  {/* 授業見出し */}
+                  <button
+                    onClick={() => toggleArchive(course.courseId)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <span className="text-sm font-semibold text-gray-800">
+                      {course.courseName}
+                    </span>
+                    <span className="text-gray-400 text-xs ml-2">
+                      {expanded ? "▾" : "▸"}
+                    </span>
+                  </button>
+
+                  {/* セッション一覧（sortOrder ASC） */}
+                  {expanded && (
+                    <ul className="border-t divide-y divide-gray-50 bg-gray-50">
+                      {course.sessions.map((s) => (
+                        <li
+                          key={s.sessionId}
+                          className="flex items-center justify-between px-5 py-2.5"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm text-gray-700 truncate">
+                              {s.sessionTitle}
+                            </span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              （{s.promptCount}問）
+                            </span>
+                          </div>
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/session/${s.sessionId}?tab=discussion`
+                              )
+                            }
+                            className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0 ml-3 transition-colors"
+                          >
+                            見返す →
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* どちらも0件 */}
+      {!hasActive && !hasArchived && (
+        <div className="text-center py-10">
+          <p className="text-gray-400 text-sm">
+            ディスカッションの記録はありません
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 共通コンポーネント ─────────────────────────────────────────
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -292,8 +379,18 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SubHeading({ children }: { children: React.ReactNode }) {
+// ─── エクスポート（Suspense でラップ: useSearchParams 対応） ─────
+
+export default function Page() {
   return (
-    <p className="text-xs font-medium text-gray-500 mb-1.5">{children}</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <p className="text-gray-400 text-sm">読み込み中...</p>
+        </div>
+      }
+    >
+      <HomePageInner />
+    </Suspense>
   );
 }

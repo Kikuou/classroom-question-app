@@ -19,6 +19,13 @@ export async function GET(
   const teacher = await isTeacher();
   const showAll = all && teacher;
 
+  // 削除済みセッションは空配列を返す（防御的チェック）
+  const [sessionRow] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
+  if (!sessionRow) return NextResponse.json([]);
+
   const rows = await db
     .select({
       id: questions.id,

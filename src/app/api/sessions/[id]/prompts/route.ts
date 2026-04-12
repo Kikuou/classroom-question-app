@@ -15,6 +15,13 @@ export async function GET(
   const url = new URL(req.url);
   const clientId = url.searchParams.get("clientId");
 
+  // 削除済みセッションは空配列を返す（防御的チェック）
+  const [sessionRow] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
+  if (!sessionRow) return NextResponse.json([]);
+
   const conditions = teacher
     ? [eq(prompts.sessionId, sessionId)]
     : [eq(prompts.sessionId, sessionId), eq(prompts.isDeleted, false)];
