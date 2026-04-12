@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { sessions, courses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+
 // 学生向け: 特定授業の公開セッション一覧
 export async function GET(
   _req: Request,
@@ -17,7 +20,7 @@ export async function GET(
     .from(courses)
     .where(and(eq(courses.id, courseId), eq(courses.isVisible, true)));
   if (!course) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_CACHE });
   }
 
   const sessionList = await db
@@ -26,5 +29,5 @@ export async function GET(
     .where(and(eq(sessions.courseId, courseId), eq(sessions.isDeleted, false)))
     .orderBy(sessions.sortOrder, sessions.createdAt);
 
-  return NextResponse.json(sessionList);
+  return NextResponse.json(sessionList, { headers: NO_CACHE });
 }

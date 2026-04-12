@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 interface SessionItem {
@@ -23,30 +23,58 @@ export default function CourseSessionsPage() {
   const [notFound, setNotFound] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  useEffect(() => {
-    // 授業名を公開リストから取得
-    fetch(`/api/courses/public?q=`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((list: CourseInfo[]) => {
+  const loadData = useCallback(async (initial: boolean = false) => {
+    if (initial) setLoading(true);
+    setServerError("");
+
+    try {
+      // 授業名を公開リストから取得
+      const courseRes = await fetch(`/api/courses/public?q=`, { cache: "no-store" });
+      if (courseRes.ok) {
+        const list: CourseInfo[] = await courseRes.json();
         const found = list.find((c) => c.id === parseInt(courseId));
         if (found) setCourse(found);
-      })
-      .catch(() => {});
+      }
 
-    // セッション一覧取得
-    fetch(`/api/courses/${courseId}/sessions`)
-      .then(async (r) => {
-        if (r.status === 404) { setNotFound(true); return null; }
-        if (!r.ok) {
-          setServerError("セッション一覧の取得に失敗しました");
-          return null;
-        }
-        return r.json();
-      })
-      .then((data) => data && setSessions(data))
-      .catch(() => setServerError("通信エラーが発生しました"))
-      .finally(() => setLoading(false));
+      // セッション一覧取得
+      const sessRes = await fetch(`/api/courses/${courseId}/sessions`, { cache: "no-store" });
+      if (sessRes.status === 404) {
+        setNotFound(true);
+        return;
+      }
+      if (!sessRes.ok) {
+        setServerError("セッション一覧の取得に失敗しました");
+        return;
+      }
+      const data: SessionItem[] = await sessRes.json();
+      setSessions(data);
+    } catch {
+      setServerError("通信エラーが発生しました");
+    } finally {
+      if (initial) setLoading(false);
+    }
   }, [courseId]);
+
+  // 初回ロード
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
+
+  // タブ復帰・bfcache 復元時に最新データを再取得
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    const handlePageshow = (e: PageTransitionEvent) => {
+      if (e.persisted) loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("pageshow", handlePageshow as EventListener);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("pageshow", handlePageshow as EventListener);
+    };
+  }, [loadData]);
 
   if (notFound) {
     return (
@@ -65,7 +93,7 @@ export default function CourseSessionsPage() {
         <div className="text-center">
           <p className="text-red-500">{serverError}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => loadData(true)}
             className="mt-3 text-sm px-4 py-2 bg-gray-800 text-white rounded-lg"
           >
             再読み込み

@@ -3,6 +3,9 @@ import { db } from "@/db";
 import { courses } from "@/db/schema";
 import { eq, ilike, and } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+
 // 学生向け: 公開授業一覧（isVisible=true）
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -18,5 +21,5 @@ export async function GET(req: Request) {
     .where(condition)
     .orderBy(courses.name);
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, { headers: NO_CACHE });
 }

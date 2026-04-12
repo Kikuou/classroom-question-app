@@ -3,6 +3,11 @@ import { db } from "@/db";
 import { courses, sessions, prompts, questions } from "@/db/schema";
 import { eq, and, inArray, sql, asc, desc } from "drizzle-orm";
 
+// Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
+export const dynamic = "force-dynamic";
+
+const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+
 // 学生用: トップページ向けに実施中・質問受付中・アーカイブを一括返却
 export async function GET() {
   try {
@@ -14,7 +19,7 @@ export async function GET() {
       .orderBy(asc(courses.createdAt));
 
     if (visibleCourses.length === 0) {
-      return NextResponse.json({ active: [], openQuestions: [], archived: [], courses: [] });
+      return NextResponse.json({ active: [], openQuestions: [], archived: [], courses: [] }, { headers: NO_CACHE });
     }
 
     const courseIds = visibleCourses.map((c) => c.id);
@@ -41,7 +46,7 @@ export async function GET() {
         openQuestions: [],
         archived: [],
         courses: visibleCourses,
-      });
+      }, { headers: NO_CACHE });
     }
 
     const sessionIds = allSessions.map((s) => s.id);
@@ -187,9 +192,9 @@ export async function GET() {
       openQuestions,
       archived,
       courses: filteredCourses,
-    });
+    }, { headers: NO_CACHE });
   } catch (e) {
     console.error("[GET /api/discussions]", e);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: NO_CACHE });
   }
 }

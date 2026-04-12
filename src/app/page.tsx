@@ -71,7 +71,7 @@ function HomePageInner() {
     if (initial) setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/discussions");
+      const res = await fetch("/api/discussions", { cache: "no-store" });
       if (!res.ok) { setError("読み込みに失敗しました"); return; }
       const d: DiscussionsData = await res.json();
       setData(d);
