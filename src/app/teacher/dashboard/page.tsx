@@ -150,6 +150,29 @@ export default function TeacherDashboardPage() {
     return false;
   };
 
+  // ディスカッション回答受付切替（ダッシュボードから即時切替）
+  const toggleDiscussion = async (courseId: number, sessionId: number, current: boolean) => {
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ discussionOpen: !current }),
+    });
+    if (res.ok) {
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.id === courseId
+            ? {
+                ...c,
+                sessions: c.sessions.map((s) =>
+                  s.id === sessionId ? { ...s, discussionOpen: !current } : s
+                ),
+              }
+            : c
+        )
+      );
+    }
+  };
+
   // セッション削除
   const deleteSession = async (courseId: number, sessionId: number) => {
     if (!confirm("このセッションを削除しますか？（質問データは保持されます）")) return;
@@ -323,6 +346,8 @@ export default function TeacherDashboardPage() {
               onDeleteSession={(sId) => deleteSession(c.id, sId)}
               onManageSession={(sId) => router.push(`/teacher/sessions/${sId}`)}
               onManageCourse={() => router.push(`/teacher/courses/${c.id}`)}
+              onToggleDiscussion={(sId, cur) => toggleDiscussion(c.id, sId, cur)}
+              onManageQuestions={() => router.push(`/teacher/courses/${c.id}/questions`)}
             />
           ))
         )}
@@ -343,6 +368,8 @@ function CourseCard({
   onDeleteSession,
   onManageSession,
   onManageCourse,
+  onToggleDiscussion,
+  onManageQuestions,
 }: {
   course: CourseItem;
   onRename: (name: string) => void;
@@ -353,6 +380,8 @@ function CourseCard({
   onDeleteSession: (sessionId: number) => void;
   onManageSession: (sessionId: number) => void;
   onManageCourse: () => void;
+  onToggleDiscussion: (sessionId: number, current: boolean) => void;
+  onManageQuestions: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -417,6 +446,7 @@ function CourseCard({
                   onRename={(title) => onRenameSession(s.id, title)}
                   onManage={() => onManageSession(s.id)}
                   onDelete={() => onDeleteSession(s.id)}
+                  onToggleDiscussion={() => onToggleDiscussion(s.id, s.discussionOpen)}
                 />
               ))}
             </ul>
@@ -449,8 +479,14 @@ function CourseCard({
         </div>
       )}
 
-      {/* 授業フッター（削除） */}
-      <div className="border-t px-4 py-2 flex items-center justify-end">
+      {/* 授業フッター（削除 + 質問管理） */}
+      <div className="border-t px-4 py-2 flex items-center justify-between">
+        <button
+          onClick={onManageQuestions}
+          className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+        >
+          質問管理 →
+        </button>
         <button
           onClick={onDelete}
           className="text-xs text-red-400 hover:text-red-600 transition-colors"
@@ -469,11 +505,13 @@ function SessionRow({
   onRename,
   onManage,
   onDelete,
+  onToggleDiscussion,
 }: {
   session: SessionItem;
   onRename: (title: string) => void;
   onManage: () => void;
   onDelete: () => void;
+  onToggleDiscussion: () => void;
 }) {
   return (
     <li className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 group">
@@ -494,14 +532,17 @@ function SessionRow({
             activeColor="green"
             inactiveColor="gray"
           />
-          <StatusBadge
-            label="回答"
-            active={session.discussionOpen}
-            activeText="受付中"
-            inactiveText="締切"
-            activeColor="orange"
-            inactiveColor="gray"
-          />
+          {/* 回答受付トグル（バッジ兼ボタン） */}
+          <button
+            onClick={onToggleDiscussion}
+            className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-colors ${
+              session.discussionOpen
+                ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
+            }`}
+          >
+            回答{session.discussionOpen ? "受付中" : "締切"}
+          </button>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
