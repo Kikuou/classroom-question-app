@@ -45,6 +45,9 @@ export default function SessionPage() {
   const [promptList, setPromptList] = useState<PromptItem[]>([]);
   const [answerInputs, setAnswerInputs] = useState<Record<number, string>>({});
   const [submittingPromptId, setSubmittingPromptId] = useState<number | null>(null);
+  const [submitErrors, setSubmitErrors] = useState<Record<number, string>>({});
+  // このセッション中に送信成功したプロンプトIDを記録（APIのmyAnswerが遅延しても即反映）
+  const [answeredPromptIds, setAnsweredPromptIds] = useState<Set<number>>(new Set());
   const [viewingResults, setViewingResults] = useState<number | null>(null);
   const [resultResponses, setResultResponses] = useState<PromptResponseItem[]>([]);
   // 全問回答一覧
@@ -106,6 +109,7 @@ export default function SessionPage() {
     const answer = answerInputs[promptId]?.trim();
     if (!answer) return;
     setSubmittingPromptId(promptId);
+    setSubmitErrors((prev) => ({ ...prev, [promptId]: "" }));
     const clientId = getClientId();
     try {
       const res = await fetch(`/api/prompts/${promptId}/responses`, {
@@ -115,8 +119,20 @@ export default function SessionPage() {
       });
       if (res.ok) {
         userEditedRef.current.delete(promptId);
+        setAnsweredPromptIds((prev) => { const next = new Set(prev); next.add(promptId); return next; });
         await fetchPrompts();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSubmitErrors((prev) => ({
+          ...prev,
+          [promptId]: data.error ?? "送信に失敗しました",
+        }));
       }
+    } catch {
+      setSubmitErrors((prev) => ({
+        ...prev,
+        [promptId]: "通信エラーが発生しました",
+      }));
     } finally {
       setSubmittingPromptId(null);
     }
@@ -309,6 +325,8 @@ export default function SessionPage() {
               {/* 回答フォーム */}
               {(() => {
                 const canAnswer = !isPreview && (session?.discussionOpen ?? false);
+                // APIのmyAnswerとローカル送信履歴の両方を参照（遅延・失敗時も即反映）
+                const isAnswered = !!p.myAnswer || answeredPromptIds.has(p.id);
                 return (
                   <div className="space-y-2">
                     <textarea
@@ -347,11 +365,15 @@ export default function SessionPage() {
                     {canAnswer ? (
                       <div className="space-y-1.5">
                         {/* 回答済みのヒント（受付中のみ表示） */}
-                        {p.myAnswer && (
+                        {isAnswered && (
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="text-green-600 font-medium">✓ 回答済み</span>
                             <span className="text-gray-400">— 再送信すると上書きされます</span>
                           </div>
+                        )}
+                        {/* 送信エラー表示 */}
+                        {submitErrors[p.id] && (
+                          <p className="text-xs text-red-500">{submitErrors[p.id]}</p>
                         )}
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs text-gray-400">
@@ -367,7 +389,7 @@ export default function SessionPage() {
                           >
                             {submittingPromptId === p.id
                               ? "送信中..."
-                              : p.myAnswer
+                              : isAnswered
                               ? "回答を更新"
                               : "回答する"}
                           </button>
@@ -379,7 +401,7 @@ export default function SessionPage() {
                           <span className="text-gray-400">
                             プレビューモード — 回答送信は無効化されています
                           </span>
-                        ) : p.myAnswer ? (
+                        ) : isAnswered ? (
                           <span className="text-green-600 font-medium">✓ 回答済み（締切済み）</span>
                         ) : (
                           <span className="text-gray-400">回答受付は終了しました</span>
