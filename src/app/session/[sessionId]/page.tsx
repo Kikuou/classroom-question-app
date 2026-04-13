@@ -345,14 +345,18 @@ export default function SessionPage() {
                       maxLength={500}
                     />
                     {canAnswer ? (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-gray-400">
-                          {answerInputs[p.id]?.length ?? 0} / 500
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {p.myAnswer && (
-                            <span className="text-xs text-green-600">回答済み</span>
-                          )}
+                      <div className="space-y-1.5">
+                        {/* 回答済みのヒント（受付中のみ表示） */}
+                        {p.myAnswer && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className="text-green-600 font-medium">✓ 回答済み</span>
+                            <span className="text-gray-400">— 再送信すると上書きされます</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-400">
+                            {answerInputs[p.id]?.length ?? 0} / 500
+                          </span>
                           <button
                             onClick={() => submitAnswer(p.id)}
                             disabled={
@@ -370,10 +374,16 @@ export default function SessionPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-500 text-center py-1">
-                        {isPreview
-                          ? "プレビューモード — 回答送信は無効化されています"
-                          : "回答受付は終了しました。みんなの回答は引き続き閲覧できます。"}
+                      <p className="text-xs text-center py-1">
+                        {isPreview ? (
+                          <span className="text-gray-400">
+                            プレビューモード — 回答送信は無効化されています
+                          </span>
+                        ) : p.myAnswer ? (
+                          <span className="text-green-600 font-medium">✓ 回答済み（締切済み）</span>
+                        ) : (
+                          <span className="text-gray-400">回答受付は終了しました</span>
+                        )}
                       </p>
                     )}
                   </div>
