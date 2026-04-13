@@ -28,6 +28,8 @@ interface ArchivedCourse {
 interface CourseItem {
   id: number;
   name: string;
+  pendingCount: number;
+  answeredCount: number;
 }
 
 interface DiscussionsData {
@@ -211,7 +213,21 @@ function QuestionsTab({
                   onClick={() => router.push(`/courses/${c.id}?tab=questions`)}
                   className={`w-full text-left px-4 py-3 bg-white rounded-lg border border-gray-200 border-l-4 ${courseAccentColor(c.id)} hover:bg-indigo-50 transition-colors shadow-sm`}
                 >
-                  <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {c.pendingCount > 0 && (
+                        <span className="text-xs text-amber-600 font-medium">
+                          未回答 {c.pendingCount}
+                        </span>
+                      )}
+                      {c.answeredCount > 0 && (
+                        <span className="text-xs text-emerald-600">
+                          回答済み {c.answeredCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-xs text-indigo-500 mt-0.5">質問する・過去の質問を見る →</p>
                 </button>
               </li>

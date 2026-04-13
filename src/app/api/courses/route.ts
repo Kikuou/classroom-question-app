@@ -21,26 +21,24 @@ export async function GET() {
 
   const courseIds = courseList.map((c) => c.id);
 
-  // 未対応質問数（授業別）
+  // 未対応質問数（授業別）— courseId で直接集計（sessionId=null の質問も含む）
   const pendingRows = await db
     .select({
-      courseId: sessions.courseId,
+      courseId: questions.courseId,
       pendingCount: sql<number>`cast(count(${questions.id}) as int)`,
     })
-    .from(sessions)
-    .innerJoin(
-      questions,
+    .from(questions)
+    .where(
       and(
-        eq(questions.sessionId, sessions.id),
         eq(questions.status, "pending"),
-        eq(questions.isDeleted, false)
+        eq(questions.isDeleted, false),
+        inArray(questions.courseId, courseIds)
       )
     )
-    .where(and(eq(sessions.isDeleted, false), inArray(sessions.courseId, courseIds)))
-    .groupBy(sessions.courseId);
+    .groupBy(questions.courseId);
 
   const pendingMap: Record<number, number> = {};
-  pendingRows.forEach((p) => { pendingMap[p.courseId] = p.pendingCount; });
+  pendingRows.forEach((p) => { if (p.courseId != null) pendingMap[p.courseId] = p.pendingCount; });
 
   // セッション一覧（全授業まとめて取得）
   const sessionRows = await db

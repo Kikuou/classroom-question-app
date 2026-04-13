@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { courses, sessions, prompts } from "@/db/schema";
-import { eq, and, inArray, asc, ne } from "drizzle-orm";
+import { courses, sessions, prompts, questions } from "@/db/schema";
+import { eq, and, inArray, asc, ne, sql } from "drizzle-orm";
 
 // Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
 export const dynamic = "force-dynamic";
@@ -24,6 +24,36 @@ export async function GET(_req: Request) {
 
     const courseIds = visibleCourses.map((c) => c.id);
     const courseMap = new Map(visibleCourses.map((c) => [c.id, c.name]));
+
+    // 1.5 質問件数（授業別: pending/answered）
+    const qCountRows = await db
+      .select({
+        courseId: questions.courseId,
+        status: questions.status,
+        count: sql<number>`cast(count(*) as int)`,
+      })
+      .from(questions)
+      .where(
+        and(
+          eq(questions.isDeleted, false),
+          inArray(questions.courseId, courseIds)
+        )
+      )
+      .groupBy(questions.courseId, questions.status);
+
+    const qCountMap: Record<number, { pending: number; answered: number }> = {};
+    qCountRows.forEach((r) => {
+      if (r.courseId == null) return;
+      if (!qCountMap[r.courseId]) qCountMap[r.courseId] = { pending: 0, answered: 0 };
+      if (r.status === "pending") qCountMap[r.courseId].pending = r.count;
+      if (r.status === "answered") qCountMap[r.courseId].answered = r.count;
+    });
+
+    const questionCoursesWithCounts = visibleCourses.map((c) => ({
+      ...c,
+      pendingCount: qCountMap[c.id]?.pending ?? 0,
+      answeredCount: qCountMap[c.id]?.answered ?? 0,
+    }));
 
     // 2. 非削除セッション（全件、sortOrder ASC → createdAt ASC の順）
     //    isDeleted を SELECT に含め、JS レベルでも二重フィルタする
@@ -62,7 +92,7 @@ export async function GET(_req: Request) {
     if (allSessions.length === 0) {
       return NextResponse.json({
         active: [],
-        questionCourses: visibleCourses,
+        questionCourses: questionCoursesWithCounts,
         archived: [],
         courses: visibleCourses,
       }, { headers: NO_CACHE });
@@ -156,7 +186,7 @@ export async function GET(_req: Request) {
 
     return NextResponse.json({
       active,
-      questionCourses: visibleCourses,
+      questionCourses: questionCoursesWithCounts,
       archived,
       courses: filteredCourses,
     }, { headers: NO_CACHE });
