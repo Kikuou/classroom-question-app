@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { courses, sessions, prompts, questions } from "@/db/schema";
-import { eq, and, inArray, sql, asc, desc, ne } from "drizzle-orm";
+import { courses, sessions, prompts } from "@/db/schema";
+import { eq, and, inArray, asc, ne } from "drizzle-orm";
 
 // Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET(_req: Request) {
       .orderBy(asc(courses.createdAt));
 
     if (visibleCourses.length === 0) {
-      return NextResponse.json({ active: [], openQuestions: [], archived: [], courses: [] }, { headers: NO_CACHE });
+      return NextResponse.json({ active: [], questionCourses: [], archived: [], courses: [] }, { headers: NO_CACHE });
     }
 
     const courseIds = visibleCourses.map((c) => c.id);
@@ -62,7 +62,7 @@ export async function GET(_req: Request) {
     if (allSessions.length === 0) {
       return NextResponse.json({
         active: [],
-        openQuestions: [],
+        questionCourses: visibleCourses,
         archived: [],
         courses: visibleCourses,
       }, { headers: NO_CACHE });
@@ -90,43 +90,6 @@ export async function GET(_req: Request) {
       promptsBySession.get(p.sessionId)!.push(p);
     });
 
-    // 4. 質問受付中セッションの質問数・最新質問プレビュー
-    const openSessionIds = allSessions.filter((s) => s.isOpen).map((s) => s.id);
-
-    const questionCountMap = new Map<number, number>();
-    const latestQuestionMap = new Map<number, string>();
-
-    if (openSessionIds.length > 0) {
-      // 質問数（セッション別）
-      const qCounts = await db
-        .select({
-          sessionId: questions.sessionId,
-          count: sql<number>`cast(count(*) as int)`,
-        })
-        .from(questions)
-        .where(
-          and(eq(questions.isDeleted, false), inArray(questions.sessionId, openSessionIds))
-        )
-        .groupBy(questions.sessionId);
-
-      qCounts.forEach((q) => questionCountMap.set(q.sessionId, q.count));
-
-      // 最新質問プレビュー（createdAt DESC で取得し、セッションごとに先頭のみ使用）
-      const latestQs = await db
-        .select({ sessionId: questions.sessionId, content: questions.content })
-        .from(questions)
-        .where(
-          and(eq(questions.isDeleted, false), inArray(questions.sessionId, openSessionIds))
-        )
-        .orderBy(desc(questions.createdAt));
-
-      latestQs.forEach((q) => {
-        if (!latestQuestionMap.has(q.sessionId)) {
-          latestQuestionMap.set(q.sessionId, q.content.slice(0, 50));
-        }
-      });
-    }
-
     // ── 実施中ディスカッション
     //    discussionOpen=true かつ 非削除プロンプトが1件以上あるセッション
     const active = allSessions
@@ -145,19 +108,6 @@ export async function GET(_req: Request) {
           },
         ];
       });
-
-    // ── 質問受付中
-    //    isOpen=true のセッション（授業名・セッション名・質問数・最新質問冒頭）
-    const openQuestions = allSessions
-      .filter((s) => s.isOpen)
-      .map((s) => ({
-        sessionId: s.id,
-        sessionTitle: s.title,
-        courseId: s.courseId,
-        courseName: courseMap.get(s.courseId) ?? "",
-        questionCount: questionCountMap.get(s.id) ?? 0,
-        latestQuestionPreview: latestQuestionMap.get(s.id) ?? null,
-      }));
 
     // ── アーカイブ
     //    discussionOpen=false かつ isResultsVisible=true のプロンプトが1件以上あるセッション
@@ -207,7 +157,7 @@ export async function GET(_req: Request) {
 
     return NextResponse.json({
       active,
-      openQuestions,
+      questionCourses: visibleCourses,
       archived,
       courses: filteredCourses,
     }, { headers: NO_CACHE });

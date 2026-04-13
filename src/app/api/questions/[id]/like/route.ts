@@ -27,7 +27,7 @@ export async function POST(
   try {
     await db
       .insert(likes)
-      .values({ questionId, sessionId: q.sessionId, clientId })
+      .values({ questionId, sessionId: q.sessionId ?? null, clientId })
       .onConflictDoNothing();
     return NextResponse.json({ ok: true });
   } catch {

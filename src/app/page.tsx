@@ -12,15 +12,6 @@ interface ActiveDiscussion {
   firstPromptPreview: string;
 }
 
-interface OpenQuestionSession {
-  sessionId: number;
-  sessionTitle: string;
-  courseId: number;
-  courseName: string;
-  questionCount: number;
-  latestQuestionPreview: string | null;
-}
-
 interface ArchivedSession {
   sessionId: number;
   sessionTitle: string;
@@ -41,7 +32,7 @@ interface CourseItem {
 
 interface DiscussionsData {
   active: ActiveDiscussion[];
-  openQuestions: OpenQuestionSession[];
+  questionCourses: CourseItem[];
   archived: ArchivedCourse[];
   courses: CourseItem[];
 }
@@ -195,71 +186,33 @@ function QuestionsTab({
   data: DiscussionsData;
   router: ReturnType<typeof useRouter>;
 }) {
-  const hasOpen = data.openQuestions.length > 0;
+  const hasCourses = data.questionCourses.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* 質問受付中セクション */}
+      {/* 授業一覧 */}
       <section>
-        <SectionHeading>質問受付中</SectionHeading>
-        {!hasOpen ? (
+        <SectionHeading>授業一覧</SectionHeading>
+        {!hasCourses ? (
           <div className="text-center py-10">
-            <p className="text-gray-400 text-sm">
-              現在、質問受付中のセッションはありません
-            </p>
+            <p className="text-gray-400 text-sm">公開中の授業がありません</p>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {data.openQuestions.map((s) => (
-              <div
-                key={s.sessionId}
-                className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-indigo-600">
-                      {s.courseName}　／　{s.sessionTitle}
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      🟢 質問受付中（{s.questionCount}件）
-                    </p>
-                    {s.latestQuestionPreview && (
-                      <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
-                        最新：「{s.latestQuestionPreview}…」
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => router.push(`/session/${s.sessionId}`)}
-                    className="shrink-0 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
-                  >
-                    質問する
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 授業一覧（過去回へのナビゲーション） */}
-      {data.courses.length > 0 && (
-        <section>
-          <SectionHeading>授業一覧</SectionHeading>
-          <ul className="space-y-1.5">
-            {data.courses.map((c) => (
+          <ul className="space-y-2">
+            {data.questionCourses.map((c) => (
               <li key={c.id}>
                 <button
-                  onClick={() => router.push(`/courses/${c.id}`)}
-                  className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
+                  onClick={() => router.push(`/courses/${c.id}?tab=questions`)}
+                  className="w-full text-left px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
                 >
-                  <p className="text-sm text-gray-700">{c.name}</p>
+                  <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                  <p className="text-xs text-indigo-500 mt-0.5">質問する・過去の質問を見る →</p>
                 </button>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }
@@ -383,6 +336,25 @@ function DiscussionTab({
               );
             })}
           </div>
+        </section>
+      )}
+
+      {/* 授業ごとに見る */}
+      {data.courses.length > 0 && (
+        <section>
+          <SectionHeading>授業ごとに見る</SectionHeading>
+          <ul className="space-y-1.5">
+            {data.courses.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => router.push(`/courses/${c.id}?tab=sessions`)}
+                  className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
+                >
+                  <p className="text-sm text-gray-700">{c.name}</p>
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

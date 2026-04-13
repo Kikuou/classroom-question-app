@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { prompts, promptResponses } from "@/db/schema";
+import { prompts, promptResponses, sessions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { isTeacher } from "@/lib/auth";
 
@@ -64,6 +64,19 @@ export async function POST(
 
   if (!prompt) {
     return NextResponse.json({ error: "問題が見つかりません" }, { status: 404 });
+  }
+
+  // セッションの discussionOpen を確認（締切後は学生の回答を拒否）
+  const teacher = await isTeacher();
+  if (!teacher) {
+    const [sess] = await db
+      .select({ discussionOpen: sessions.discussionOpen })
+      .from(sessions)
+      .where(eq(sessions.id, prompt.sessionId));
+
+    if (sess && !sess.discussionOpen) {
+      return NextResponse.json({ error: "回答受付は終了しました" }, { status: 403 });
+    }
   }
 
   // upsert: UNIQUE(prompt_id, client_id) で衝突時は上書き

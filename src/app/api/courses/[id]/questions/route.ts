@@ -1,30 +1,55 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { questions, replies, likes, sessions } from "@/db/schema";
-import { eq, sql, and, ne, inArray } from "drizzle-orm";
+import { questions, likes, replies, sessions, courses } from "@/db/schema";
+import { eq, and, ne, or, sql, desc, asc, inArray, isNull } from "drizzle-orm";
 import { isTeacher } from "@/lib/auth";
 
-// 質問一覧（いいね数・返信含む）
+export const dynamic = "force-dynamic";
+const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+
+// 学生向け授業質問一覧
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const sessionId = parseInt(id);
+  const courseId = parseInt(id);
   const url = new URL(req.url);
-  const all = url.searchParams.get("all") === "true";
   const sort = url.searchParams.get("sort") ?? "time";
   const clientId = url.searchParams.get("clientId") ?? "";
 
   const teacher = await isTeacher();
-  const showAll = all && teacher;
 
-  // 削除済みセッションは空配列を返す（防御的チェック）
-  const [sessionRow] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
-  if (!sessionRow) return NextResponse.json([]);
+  // 授業が公開されているか確認
+  const [course] = await db
+    .select({ id: courses.id, isVisible: courses.isVisible })
+    .from(courses)
+    .where(eq(courses.id, courseId));
+
+  if (!course || !course.isVisible) {
+    return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_CACHE });
+  }
+
+  // 1. 新形式: questions.courseId = courseId
+  // 2. 旧形式: questions.sessionId → sessions.courseId = courseId (LEFT JOIN)
+  // 両方をUNION的に取得するため、LEFT JOINを利用
+
+  const baseCondition = teacher
+    ? and(
+        eq(questions.isDeleted, false),
+        or(
+          eq(questions.courseId, courseId),
+          eq(sessions.courseId, courseId)
+        )
+      )
+    : and(
+        eq(questions.isDeleted, false),
+        ne(questions.status, "hidden"),
+        or(
+          eq(questions.courseId, courseId),
+          eq(sessions.courseId, courseId)
+        )
+      );
 
   const rows = await db
     .select({
@@ -34,29 +59,23 @@ export async function GET(
       status: questions.status,
       sortOrder: questions.sortOrder,
       createdAt: questions.createdAt,
+      sessionTitle: sessions.title,
       likeCount: sql<number>`cast(count(distinct ${likes.id}) as int)`,
     })
     .from(questions)
+    .leftJoin(sessions, eq(sessions.id, questions.sessionId))
     .leftJoin(likes, eq(likes.questionId, questions.id))
-    .where(
-      showAll
-        ? and(eq(questions.sessionId, sessionId), eq(questions.isDeleted, false))
-        : and(
-            eq(questions.sessionId, sessionId),
-            eq(questions.isDeleted, false),
-            ne(questions.status, "hidden")
-          )
-    )
-    .groupBy(questions.id)
+    .where(baseCondition)
+    .groupBy(questions.id, sessions.title)
     .orderBy(
       sort === "likes"
         ? sql`count(distinct ${likes.id}) desc, ${questions.createdAt} asc`
-        : sort === "manual"
-        ? sql`${questions.sortOrder} asc, ${questions.createdAt} asc`
         : sql`${questions.createdAt} asc`
     );
 
-  if (rows.length === 0) return NextResponse.json([]);
+  if (rows.length === 0) {
+    return NextResponse.json([], { headers: NO_CACHE });
+  }
 
   const questionIds = rows.map((r) => r.id);
 
@@ -85,42 +104,44 @@ export async function GET(
       ...q,
       likedByClient: clientLikedSet.has(q.id),
       replies: replyMap[q.id] ?? [],
-    }))
+    })),
+    { headers: NO_CACHE }
   );
 }
 
-// 質問投稿
+// 授業への質問投稿
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const sessionId = parseInt(id);
+  const courseId = parseInt(id);
 
-  const [session] = await db
-    .select()
-    .from(sessions)
-    .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
-  if (!session) {
-    return NextResponse.json({ error: "セッションが見つかりません" }, { status: 404 });
-  }
-  if (!session.isOpen) {
-    return NextResponse.json({ error: "このセッションは締め切られています" }, { status: 403 });
+  // 授業が公開されているか確認
+  const [course] = await db
+    .select({ id: courses.id, isVisible: courses.isVisible })
+    .from(courses)
+    .where(eq(courses.id, courseId));
+
+  if (!course || !course.isVisible) {
+    return NextResponse.json({ error: "授業が見つかりません" }, { status: 404, headers: NO_CACHE });
   }
 
   const { content, authorName, clientId } = await req.json();
   if (!content?.trim() || !clientId) {
-    return NextResponse.json({ error: "質問内容とclientIdは必須です" }, { status: 400 });
+    return NextResponse.json({ error: "質問内容とclientIdは必須です" }, { status: 400, headers: NO_CACHE });
   }
 
   const [question] = await db
     .insert(questions)
     .values({
-      sessionId,
+      courseId,
+      sessionId: null,
       content: content.trim(),
       authorName: authorName?.trim() || null,
       clientId,
     })
     .returning();
-  return NextResponse.json(question, { status: 201 });
+
+  return NextResponse.json(question, { status: 201, headers: NO_CACHE });
 }

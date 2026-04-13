@@ -38,9 +38,10 @@ export const sessions = pgTable("sessions", {
 
 export const questions = pgTable("questions", {
   id: serial("id").primaryKey(),
+  courseId: integer("course_id")
+    .references(() => courses.id, { onDelete: "cascade" }),
   sessionId: integer("session_id")
-    .notNull()
-    .references(() => sessions.id, { onDelete: "cascade" }),
+    .references(() => sessions.id, { onDelete: "set null" }),
   content: text("content").notNull(),
   authorName: text("author_name"),
   clientId: text("client_id").notNull(),
@@ -67,8 +68,7 @@ export const likes = pgTable(
       .notNull()
       .references(() => questions.id, { onDelete: "cascade" }),
     sessionId: integer("session_id")
-      .notNull()
-      .references(() => sessions.id, { onDelete: "cascade" }),
+      .references(() => sessions.id, { onDelete: "set null" }),
     clientId: text("client_id").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

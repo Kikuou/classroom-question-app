@@ -8,6 +8,13 @@
       "when": 1775712754560,
       "tag": "0000_pink_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1776004314022,
+      "tag": "0001_conscious_magdalene",
+      "breakpoints": true
     }
   ]
 }
