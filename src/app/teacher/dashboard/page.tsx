@@ -524,14 +524,6 @@ function SessionRow({
         />
         {/* 状態バッジ */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <StatusBadge
-            label="質問"
-            active={session.isOpen}
-            activeText="受付中"
-            inactiveText="締切"
-            activeColor="green"
-            inactiveColor="gray"
-          />
           {/* 回答受付トグル（バッジ兼ボタン） */}
           <button
             onClick={onToggleDiscussion}
