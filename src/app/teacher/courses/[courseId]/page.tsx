@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 interface SessionItem {
   id: number;
   title: string;
-  isOpen: boolean;
+  discussionOpen: boolean;
   sortOrder: number;
   createdAt: string;
 }
@@ -235,7 +235,7 @@ export default function TeacherCoursePage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{s.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {s.isOpen ? "受付中" : "締切済"}
+                      回答{s.discussionOpen ? "受付中" : "締切"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

@@ -7,7 +7,6 @@ interface SessionItem {
   id: number;
   courseId: number;
   title: string;
-  isOpen: boolean;
   discussionOpen: boolean;
   sortOrder: number;
   createdAt: string;
@@ -660,41 +659,6 @@ function InlineEdit({
       {value}
       <span className="ml-1 text-gray-300 group-hover/edit:text-gray-400 text-xs">✎</span>
     </button>
-  );
-}
-
-// ─── ステータスバッジ ─────────────────────────────────────────────
-
-function StatusBadge({
-  label,
-  active,
-  activeText,
-  inactiveText,
-  activeColor,
-  inactiveColor,
-}: {
-  label: string;
-  active: boolean;
-  activeText: string;
-  inactiveText: string;
-  activeColor: "green" | "orange" | "blue";
-  inactiveColor: "gray";
-}) {
-  const colorMap = {
-    green: "bg-emerald-100 text-emerald-800",
-    orange: "bg-amber-100 text-amber-800",
-    blue: "bg-indigo-100 text-indigo-700",
-    gray: "bg-gray-100 text-gray-400",
-  };
-
-  return (
-    <span
-      className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-        active ? colorMap[activeColor] : colorMap[inactiveColor]
-      }`}
-    >
-      {label}:{active ? activeText : inactiveText}
-    </span>
   );
 }
 

@@ -273,7 +273,7 @@ function DiscussionTab({
                   </div>
                   <button
                     onClick={() =>
-                      router.push(`/session/${d.sessionId}?tab=discussion`)
+                      router.push(`/session/${d.sessionId}`)
                     }
                     className="shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
                   >
@@ -326,9 +326,7 @@ function DiscussionTab({
                           </div>
                           <button
                             onClick={() =>
-                              router.push(
-                                `/session/${s.sessionId}?tab=discussion`
-                              )
+                              router.push(`/session/${s.sessionId}`)
                             }
                             className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0 ml-3 transition-colors"
                           >
