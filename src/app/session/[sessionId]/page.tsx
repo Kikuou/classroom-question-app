@@ -55,6 +55,13 @@ export default function SessionPage() {
   const [overviewData, setOverviewData] = useState<OverviewItem[]>([]);
   const [overviewLoading, setOverviewLoading] = useState(false);
 
+  // === トースト通知 ===
+  const [toast, setToast] = useState("");
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  };
+
   // === IME対応: ユーザーが手入力中のPromptIDを追跡 ===
   const userEditedRef = useRef<Set<number>>(new Set());
   const isComposingRef = useRef(false);
@@ -120,6 +127,7 @@ export default function SessionPage() {
       if (res.ok) {
         userEditedRef.current.delete(promptId);
         setAnsweredPromptIds((prev) => { const next = new Set(prev); next.add(promptId); return next; });
+        showToast("✓ 回答を保存しました");
         await fetchPrompts();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -215,7 +223,7 @@ export default function SessionPage() {
                 </button>
               </div>
               {overviewData.length === 0 ? (
-                <p className="text-center text-gray-400 py-12 text-sm">公開中の回答がありません</p>
+                <p className="text-center text-gray-400 py-12 text-sm">まだ回答はありません</p>
               ) : (
                 <div className="space-y-6">
                   {overviewData.map((p, qi) => (
@@ -300,21 +308,26 @@ export default function SessionPage() {
           </div>
         )}
 
-        {/* 全問回答一覧ボタン（締切後のみ表示） */}
+        {/* 締切後: 学習促進メッセージ＋全問回答一覧ボタン */}
         {!session?.discussionOpen && promptList.length > 0 && (
-          <button
-            onClick={loadOverview}
-            disabled={overviewLoading}
-            className="w-full py-2.5 rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 disabled:opacity-50 transition-colors"
-          >
-            {overviewLoading ? "読み込み中..." : "📋 全問の回答をまとめて見る"}
-          </button>
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500 text-center">
+              回答受付が終了しました。みんなの考えと自分の回答を比べてみましょう。
+            </p>
+            <button
+              onClick={loadOverview}
+              disabled={overviewLoading}
+              className="w-full py-2.5 rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+            >
+              {overviewLoading ? "読み込み中..." : "📋 全問の回答をまとめて見る"}
+            </button>
+          </div>
         )}
 
         {/* ディスカッション問題一覧 */}
         {promptList.length === 0 ? (
           <div className="text-center text-gray-400 py-12 text-sm">
-            まだ問題がありません
+            まだ問題が追加されていません
           </div>
         ) : (
           promptList.map((p, qi) => (
@@ -452,6 +465,13 @@ export default function SessionPage() {
         {/* 下部余白 */}
         <div className="h-6" />
       </div>
+
+      {/* トースト通知 */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-gray-800/90 text-white text-sm rounded-full shadow-lg pointer-events-none whitespace-nowrap">
+          {toast}
+        </div>
+      )}
     </main>
   );
 }

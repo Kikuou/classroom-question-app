@@ -201,7 +201,7 @@ function QuestionsTab({
         <SectionHeading>授業一覧</SectionHeading>
         {!hasCourses ? (
           <div className="text-center py-10">
-            <p className="text-gray-400 text-sm">公開中の授業がありません</p>
+            <p className="text-gray-400 text-sm">まだ授業が公開されていません</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -209,7 +209,7 @@ function QuestionsTab({
               <li key={c.id}>
                 <button
                   onClick={() => router.push(`/courses/${c.id}?tab=questions`)}
-                  className="w-full text-left px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
+                  className={`w-full text-left px-4 py-3 bg-white rounded-lg border border-gray-200 border-l-4 ${courseAccentColor(c.id)} hover:bg-indigo-50 transition-colors shadow-sm`}
                 >
                   <p className="text-sm font-medium text-gray-800">{c.name}</p>
                   <p className="text-xs text-indigo-500 mt-0.5">質問する・過去の質問を見る →</p>
@@ -247,7 +247,7 @@ function DiscussionTab({
         {!hasActive ? (
           <div className="text-center py-10">
             <p className="text-gray-400 text-sm">
-              現在、実施中のディスカッションはありません
+              現在、進行中のディスカッションはありません
             </p>
           </div>
         ) : (
@@ -352,7 +352,7 @@ function DiscussionTab({
               <li key={c.id}>
                 <button
                   onClick={() => router.push(`/courses/${c.id}?tab=sessions`)}
-                  className="w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
+                  className={`w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 border-l-4 ${courseAccentColor(c.id)} hover:bg-indigo-50 transition-colors shadow-sm`}
                 >
                   <p className="text-sm text-gray-700">{c.name}</p>
                 </button>
@@ -366,7 +366,7 @@ function DiscussionTab({
       {!hasActive && !hasArchived && (
         <div className="text-center py-10">
           <p className="text-gray-400 text-sm">
-            ディスカッションの記録はありません
+            まだディスカッションは行われていません
           </p>
         </div>
       )}
@@ -382,6 +382,18 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
       {children}
     </h2>
   );
+}
+
+// 授業カードの左ボーダーアクセント色（courseId でローテーション）
+const COURSE_ACCENT = [
+  "border-l-indigo-300",
+  "border-l-emerald-300",
+  "border-l-amber-300",
+  "border-l-rose-300",
+  "border-l-violet-300",
+];
+function courseAccentColor(id: number) {
+  return COURSE_ACCENT[id % COURSE_ACCENT.length];
 }
 
 // ─── エクスポート（Suspense でラップ: useSearchParams 対応） ─────

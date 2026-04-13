@@ -67,6 +67,13 @@ function CoursePageInner() {
   const [questionsOpen, setQuestionsOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
+  // === トースト通知 ===
+  const [toast, setToast] = useState("");
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  };
+
   // === セッションタブ state ===
   const [sessions, setSessions] = useState<SessionItem[]>([]);
 
@@ -206,6 +213,7 @@ function CoursePageInner() {
         return;
       }
       setContent("");
+      showToast("✓ 質問を送信しました");
       await fetchQuestions();
     } finally {
       setSubmitting(false);
@@ -361,7 +369,7 @@ function CoursePageInner() {
             {/* 質問一覧 */}
             {questions.length === 0 ? (
               <div className="text-center text-gray-400 py-12 text-sm">
-                まだ質問がありません
+                まだ質問はありません。気になることがあれば投稿してみましょう
               </div>
             ) : (
               <div className="space-y-3">
@@ -380,7 +388,7 @@ function CoursePageInner() {
             {/* セッション一覧（ディスカッション用） */}
             {sessions.length === 0 ? (
               <div className="text-center text-gray-400 py-12 text-sm">
-                ディスカッションのセッションがありません
+                まだディスカッションは開始されていません
               </div>
             ) : (
               <ul className="space-y-2">
@@ -401,6 +409,13 @@ function CoursePageInner() {
 
         <div className="h-6" />
       </div>
+
+      {/* トースト通知 */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-gray-800/90 text-white text-sm rounded-full shadow-lg pointer-events-none whitespace-nowrap">
+          {toast}
+        </div>
+      )}
     </main>
   );
 }
