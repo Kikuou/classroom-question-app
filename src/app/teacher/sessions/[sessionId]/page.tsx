@@ -7,7 +7,6 @@ interface PromptItem {
   id: number;
   content: string;
   sortOrder: number;
-  isResultsVisible: boolean;
   isDeleted: boolean;
   responseCount: number;
   createdAt: string;
@@ -51,8 +50,6 @@ export default function TeacherSessionPage() {
   const [showOverview, setShowOverview] = useState(false);
   const [overviewData, setOverviewData] = useState<(PromptItem & { responses: PromptResponseItem[] })[]>([]);
   const [overviewLoading, setOverviewLoading] = useState(false);
-  // 一括切替
-  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // === 全体説明 state ===
   const [descInput, setDescInput] = useState("");
@@ -168,16 +165,65 @@ export default function TeacherSessionPage() {
     if (res.ok) setPromptList((prev) => prev.filter((p) => p.id !== promptId));
   };
 
-  const toggleResultsVisible = async (promptId: number, current: boolean) => {
-    const res = await fetch(`/api/prompts/${promptId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isResultsVisible: !current }),
-    });
+  // === 問題複製 ===
+  const duplicatePrompt = async (promptId: number) => {
+    const res = await fetch(`/api/prompts/${promptId}/duplicate`, { method: "POST" });
+    if (res.ok) await fetchPrompts();
+  };
+
+  // === 個別回答削除 ===
+  const deleteResponse = async (promptId: number, responseId: number) => {
+    if (!confirm("この回答を削除しますか？（元に戻せません）")) return;
+    const res = await fetch(`/api/prompts/${promptId}/responses/${responseId}`, { method: "DELETE" });
     if (res.ok) {
+      setResponses((prev) => prev.filter((r) => r.id !== responseId));
       setPromptList((prev) =>
-        prev.map((p) => p.id === promptId ? { ...p, isResultsVisible: !current } : p)
+        prev.map((p) => p.id === promptId ? { ...p, responseCount: Math.max(0, p.responseCount - 1) } : p)
       );
+    }
+  };
+
+  // === 問題単位の全回答削除 ===
+  const deleteAllResponses = async (promptId: number) => {
+    const p = promptList.find((x) => x.id === promptId);
+    if (!confirm(`この問題の全回答（${p?.responseCount ?? 0}件）を削除しますか？\n問題は残ります。元に戻せません。`)) return;
+    const res = await fetch(`/api/prompts/${promptId}/responses`, { method: "DELETE" });
+    if (res.ok) {
+      if (viewingResponses === promptId) { setResponses([]); setViewingResponses(null); }
+      setPromptList((prev) => prev.map((p) => p.id === promptId ? { ...p, responseCount: 0 } : p));
+    }
+  };
+
+  // === セッション単位の全回答削除 ===
+  const deleteAllSessionResponses = async () => {
+    const total = promptList.filter((p) => !p.isDeleted).reduce((s, p) => s + p.responseCount, 0);
+    if (!confirm(`このセッションの全回答（計 ${total} 件）を削除しますか？\n問題は残ります。元に戻せません。`)) return;
+    const res = await fetch(`/api/sessions/${sessionId}/responses`, { method: "DELETE" });
+    if (res.ok) {
+      setResponses([]);
+      setViewingResponses(null);
+      setPromptList((prev) => prev.map((p) => ({ ...p, responseCount: 0 })));
+    }
+  };
+
+  // === セッション複製 ===
+  const [duplicating, setDuplicating] = useState(false);
+  const duplicateSession = async () => {
+    if (!session) return;
+    if (!confirm(`「${session.title}」を複製しますか？\n全問題が引き継がれます（学生回答は複製されません）`)) return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/teacher/sessions/${data.session.id}`);
+      }
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -190,29 +236,6 @@ export default function TeacherSessionPage() {
     if (res.ok) {
       setResponses(await res.json());
       setViewingResponses(promptId);
-    }
-  };
-
-  // === 一括結果公開/非公開 ===
-  const bulkToggleVisibility = async (makeVisible: boolean) => {
-    const targets = promptList.filter((p) => !p.isDeleted);
-    if (targets.length === 0) return;
-    setBulkUpdating(true);
-    try {
-      await Promise.all(
-        targets.map((p) =>
-          fetch(`/api/prompts/${p.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isResultsVisible: makeVisible }),
-          })
-        )
-      );
-      setPromptList((prev) =>
-        prev.map((p) => (p.isDeleted ? p : { ...p, isResultsVisible: makeVisible }))
-      );
-    } finally {
-      setBulkUpdating(false);
     }
   };
 
@@ -335,6 +358,13 @@ export default function TeacherSessionPage() {
               >
                 {session?.discussionOpen ? "回答受付中 →締切" : "回答締切中 →再開"}
               </button>
+              <button
+                onClick={duplicateSession}
+                disabled={!session || duplicating}
+                className="text-xs px-3 py-1 border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+              >
+                {duplicating ? "複製中..." : "📋 複製"}
+              </button>
             </div>
           </div>
 
@@ -366,25 +396,17 @@ export default function TeacherSessionPage() {
           <div className="bg-white rounded-lg border p-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">一括操作:</span>
             <button
-              onClick={() => bulkToggleVisibility(true)}
-              disabled={bulkUpdating}
-              className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg border border-green-200 hover:bg-green-200 disabled:opacity-50"
-            >
-              全問公開
-            </button>
-            <button
-              onClick={() => bulkToggleVisibility(false)}
-              disabled={bulkUpdating}
-              className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-200 disabled:opacity-50"
-            >
-              全問非公開
-            </button>
-            <button
               onClick={loadOverview}
               disabled={overviewLoading}
               className="text-xs px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 hover:bg-indigo-200 disabled:opacity-50 ml-auto"
             >
               {overviewLoading ? "読み込み中..." : "📋 全問の回答を一覧表示"}
+            </button>
+            <button
+              onClick={deleteAllSessionResponses}
+              className="text-xs px-3 py-1.5 bg-red-50 text-red-500 rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              🗑 全回答削除
             </button>
           </div>
         )}
@@ -513,21 +535,11 @@ export default function TeacherSessionPage() {
                 )}
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="text-xs text-gray-500">{p.responseCount} 件回答</span>
-                  <button
-                    onClick={() => toggleResultsVisible(p.id, p.isResultsVisible)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      p.isResultsVisible
-                        ? "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"
-                        : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
-                    }`}
-                  >
-                    {p.isResultsVisible ? "結果公開中" : "結果非公開"}
-                  </button>
                 </div>
               </div>
 
               {/* 操作ボタン */}
-              <div className="border-t pt-2 flex items-center gap-2">
+              <div className="border-t pt-2 flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => viewResponses(p.id)}
                   className="text-xs text-indigo-500 hover:text-indigo-700"
@@ -544,6 +556,20 @@ export default function TeacherSessionPage() {
                   編集
                 </button>
                 <button
+                  onClick={() => duplicatePrompt(p.id)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  複製
+                </button>
+                {p.responseCount > 0 && (
+                  <button
+                    onClick={() => deleteAllResponses(p.id)}
+                    className="text-xs text-red-300 hover:text-red-500"
+                  >
+                    全回答削除
+                  </button>
+                )}
+                <button
                   onClick={() => deletePrompt(p.id)}
                   className="text-xs text-red-400 hover:text-red-600 ml-auto"
                 >
@@ -558,8 +584,14 @@ export default function TeacherSessionPage() {
                     <p className="text-xs text-gray-400">まだ回答がありません</p>
                   ) : (
                     responses.map((r) => (
-                      <div key={r.id} className="bg-indigo-50 rounded-lg px-3 py-2 text-xs text-indigo-800">
-                        {r.answer}
+                      <div key={r.id} className="bg-indigo-50 rounded-lg px-3 py-2 text-xs text-indigo-800 flex items-start justify-between gap-2">
+                        <span className="flex-1">{r.answer}</span>
+                        <button
+                          onClick={() => deleteResponse(p.id, r.id)}
+                          className="text-xs text-red-300 hover:text-red-500 shrink-0"
+                        >
+                          削除
+                        </button>
                       </div>
                     ))
                   )}

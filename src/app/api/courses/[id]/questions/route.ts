@@ -22,7 +22,7 @@ export async function GET(
 
   // 授業が公開されているか確認
   const [course] = await db
-    .select({ id: courses.id, isVisible: courses.isVisible })
+    .select({ id: courses.id, isVisible: courses.isVisible, questionsOpen: courses.questionsOpen })
     .from(courses)
     .where(eq(courses.id, courseId));
 
@@ -91,18 +91,27 @@ export async function GET(
   }, {});
 
   const clientLikedSet = new Set<number>();
+  const clientOwnedSet = new Set<number>();
   if (clientId) {
-    const clientLikes = await db
-      .select({ questionId: likes.questionId })
-      .from(likes)
-      .where(and(inArray(likes.questionId, questionIds), eq(likes.clientId, clientId)));
+    const [clientLikes, clientOwned] = await Promise.all([
+      db
+        .select({ questionId: likes.questionId })
+        .from(likes)
+        .where(and(inArray(likes.questionId, questionIds), eq(likes.clientId, clientId))),
+      db
+        .select({ id: questions.id })
+        .from(questions)
+        .where(and(inArray(questions.id, questionIds), eq(questions.clientId, clientId))),
+    ]);
     clientLikes.forEach((l) => clientLikedSet.add(l.questionId));
+    clientOwned.forEach((q) => clientOwnedSet.add(q.id));
   }
 
   return NextResponse.json(
     rows.map((q) => ({
       ...q,
       likedByClient: clientLikedSet.has(q.id),
+      isOwner: clientOwnedSet.has(q.id),
       replies: replyMap[q.id] ?? [],
     })),
     { headers: NO_CACHE }
@@ -119,12 +128,16 @@ export async function POST(
 
   // 授業が公開されているか確認
   const [course] = await db
-    .select({ id: courses.id, isVisible: courses.isVisible })
+    .select({ id: courses.id, isVisible: courses.isVisible, questionsOpen: courses.questionsOpen })
     .from(courses)
     .where(eq(courses.id, courseId));
 
   if (!course || !course.isVisible) {
     return NextResponse.json({ error: "授業が見つかりません" }, { status: 404, headers: NO_CACHE });
+  }
+
+  if (!course.questionsOpen) {
+    return NextResponse.json({ error: "質問受付は終了しました" }, { status: 403, headers: NO_CACHE });
   }
 
   const { content, authorName, clientId } = await req.json();

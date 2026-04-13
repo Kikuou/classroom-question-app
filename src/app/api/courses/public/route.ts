@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     : eq(courses.isVisible, true);
 
   const result = await db
-    .select({ id: courses.id, name: courses.name, code: courses.code })
+    .select({ id: courses.id, name: courses.name, code: courses.code, questionsOpen: courses.questionsOpen })
     .from(courses)
     .where(condition)
     .orderBy(courses.name);

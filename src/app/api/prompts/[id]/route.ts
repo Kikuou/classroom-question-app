@@ -17,13 +17,10 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const updateData: Partial<{ content: string; isResultsVisible: boolean }> = {};
+  const updateData: Partial<{ content: string }> = {};
 
   if (typeof body.content === "string" && body.content.trim()) {
     updateData.content = body.content.trim();
-  }
-  if (typeof body.isResultsVisible === "boolean") {
-    updateData.isResultsVisible = body.isResultsVisible;
   }
 
   if (Object.keys(updateData).length === 0) {

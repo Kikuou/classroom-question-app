@@ -17,6 +17,7 @@ interface CourseItem {
   id: number;
   name: string;
   isVisible: boolean;
+  questionsOpen: boolean;
   pendingCount: number;
   sessions: SessionItem[];
 }
@@ -122,6 +123,18 @@ export default function TeacherDashboardPage() {
     });
     if (res.ok) {
       setCourses((prev) => prev.map((c) => c.id === courseId ? { ...c, isVisible: !current } : c));
+    }
+  };
+
+  // 質問受付切替
+  const toggleQuestionsOpen = async (courseId: number, current: boolean) => {
+    const res = await fetch(`/api/courses/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionsOpen: !current }),
+    });
+    if (res.ok) {
+      setCourses((prev) => prev.map((c) => c.id === courseId ? { ...c, questionsOpen: !current } : c));
     }
   };
 
@@ -340,6 +353,7 @@ export default function TeacherDashboardPage() {
               course={c}
               onRename={(name) => renameCourse(c.id, name)}
               onToggleVisible={() => toggleVisible(c.id, c.isVisible)}
+              onToggleQuestionsOpen={() => toggleQuestionsOpen(c.id, c.questionsOpen)}
               onDelete={() => deleteCourse(c.id, c.name)}
               onCreateSession={(title) => createSession(c.id, title)}
               onRenameSession={(sId, title) => renameSession(c.id, sId, title)}
@@ -362,6 +376,7 @@ function CourseCard({
   course,
   onRename,
   onToggleVisible,
+  onToggleQuestionsOpen,
   onDelete,
   onCreateSession,
   onRenameSession,
@@ -374,6 +389,7 @@ function CourseCard({
   course: CourseItem;
   onRename: (name: string) => void;
   onToggleVisible: () => void;
+  onToggleQuestionsOpen: () => void;
   onDelete: () => void;
   onCreateSession: (title: string) => Promise<boolean>;
   onRenameSession: (sessionId: number, title: string) => void;
@@ -412,14 +428,26 @@ function CourseCard({
               placeholder="授業名"
             />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
             {course.pendingCount > 0 && (
               <span className="text-xs bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-full">
                 未対応 {course.pendingCount}
               </span>
             )}
             <button
+              onClick={onToggleQuestionsOpen}
+              title="質問受付のON/OFFを切り替え"
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                course.questionsOpen
+                  ? "border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100"
+                  : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              質問{course.questionsOpen ? "受付中" : "締切"}
+            </button>
+            <button
               onClick={onToggleVisible}
+              title="授業の公開/非公開を切り替え"
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                 course.isVisible
                   ? "border-green-200 text-green-600 bg-green-50 hover:bg-green-100"

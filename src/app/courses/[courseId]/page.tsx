@@ -19,6 +19,7 @@ interface QuestionItem {
   status: string;
   likeCount: number;
   likedByClient: boolean;
+  isOwner: boolean;
   createdAt: string;
   sessionTitle: string | null;
   replies: Reply[];
@@ -34,6 +35,7 @@ interface SessionItem {
 interface CourseInfo {
   id: number;
   name: string;
+  questionsOpen: boolean;
 }
 
 const POLL_INTERVAL = 5000;
@@ -62,6 +64,7 @@ function CoursePageInner() {
   const [anonymous, setAnonymous] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [questionsOpen, setQuestionsOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
   // === セッションタブ state ===
@@ -79,8 +82,12 @@ function CoursePageInner() {
       .then((r) => r.ok ? r.json() : [])
       .then((list: CourseInfo[]) => {
         const found = list.find((c) => c.id === parseInt(courseId));
-        if (found) setCourse(found);
-        else setNotFound(true);
+        if (found) {
+          setCourse(found);
+          setQuestionsOpen(found.questionsOpen);
+        } else {
+          setNotFound(true);
+        }
       })
       .catch(() => setServerError("授業情報の取得に失敗しました"));
   }, [courseId]);
@@ -163,6 +170,18 @@ function CoursePageInner() {
       window.removeEventListener("pageshow", handlePageshow as EventListener);
     };
   }, [tab, fetchQuestions, fetchSessions]);
+
+  // 質問取り消し（自分の pending 質問のみ）
+  const handleDeleteQuestion = async (questionId: number) => {
+    if (!confirm("この質問を取り消しますか？")) return;
+    const clientId = getClientId();
+    const res = await fetch(`/api/questions/${questionId}?clientId=${encodeURIComponent(clientId)}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+    }
+  };
 
   // 質問投稿
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,49 +288,55 @@ function CoursePageInner() {
           <div className="text-center text-gray-400 py-16 text-sm">読み込み中...</div>
         ) : tab === "questions" ? (
           <>
-            {/* 質問投稿フォーム */}
-            <div className="bg-white rounded-lg shadow-sm border p-4">
-              <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="質問を入力してください..."
-                  rows={4}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
-                  maxLength={500}
-                />
-                <div className="flex items-center gap-3 flex-wrap">
-                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={anonymous}
-                      onChange={(e) => setAnonymous(e.target.checked)}
-                      className="rounded"
-                    />
-                    匿名で投稿
-                  </label>
-                  {!anonymous && (
-                    <input
-                      type="text"
-                      value={authorName}
-                      onChange={(e) => setAuthorName(e.target.value)}
-                      placeholder="名前（任意）"
-                      className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
-                      maxLength={50}
-                    />
-                  )}
-                </div>
-                {submitError && <p className="text-red-500 text-xs">{submitError}</p>}
-                <button
-                  type="submit"
-                  disabled={submitting || !content.trim()}
-                  className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {submitting ? "投稿中..." : "質問を送信"}
-                </button>
-              </form>
-            </div>
+            {/* 質問投稿フォーム or 締切表示 */}
+            {questionsOpen ? (
+              <div className="bg-white rounded-lg shadow-sm border p-4">
+                <h2 className="font-semibold text-gray-700 mb-3 text-sm">質問を投稿する</h2>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="質問を入力してください..."
+                    rows={4}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
+                    maxLength={500}
+                  />
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={anonymous}
+                        onChange={(e) => setAnonymous(e.target.checked)}
+                        className="rounded"
+                      />
+                      匿名で投稿
+                    </label>
+                    {!anonymous && (
+                      <input
+                        type="text"
+                        value={authorName}
+                        onChange={(e) => setAuthorName(e.target.value)}
+                        placeholder="名前（任意）"
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
+                        maxLength={50}
+                      />
+                    )}
+                  </div>
+                  {submitError && <p className="text-red-500 text-xs">{submitError}</p>}
+                  <button
+                    type="submit"
+                    disabled={submitting || !content.trim()}
+                    className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  >
+                    {submitting ? "投稿中..." : "質問を送信"}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-500 text-center">
+                この授業の質問受付は締め切られています
+              </div>
+            )}
 
             {/* ソート切替 */}
             <div className="flex items-center justify-between">
@@ -341,7 +366,11 @@ function CoursePageInner() {
             ) : (
               <div className="space-y-3">
                 {questions.map((q) => (
-                  <QuestionCard key={q.id} question={q} />
+                  <QuestionCard
+                    key={q.id}
+                    question={q}
+                    onDelete={q.isOwner && q.status === "pending" ? () => handleDeleteQuestion(q.id) : undefined}
+                  />
                 ))}
               </div>
             )}
@@ -376,7 +405,7 @@ function CoursePageInner() {
   );
 }
 
-function QuestionCard({ question }: { question: QuestionItem }) {
+function QuestionCard({ question, onDelete }: { question: QuestionItem; onDelete?: () => void }) {
   const [showReplies, setShowReplies] = useState(true);
   const dt = new Date(question.createdAt).toLocaleTimeString("ja-JP", {
     hour: "2-digit",
@@ -397,11 +426,21 @@ function QuestionCard({ question }: { question: QuestionItem }) {
       </div>
       <div className="flex items-center justify-between text-xs text-gray-400">
         <span>{question.authorName ?? "匿名"} · {dt}</span>
-        <LikeButton
-          questionId={question.id}
-          likeCount={question.likeCount}
-          likedByClient={question.likedByClient}
-        />
+        <div className="flex items-center gap-2">
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="text-xs text-red-400 hover:text-red-600 transition-colors"
+            >
+              取り消す
+            </button>
+          )}
+          <LikeButton
+            questionId={question.id}
+            likeCount={question.likeCount}
+            likedByClient={question.likedByClient}
+          />
+        </div>
       </div>
       {question.replies.length > 0 && (
         <div className="mt-2 border-t pt-2">

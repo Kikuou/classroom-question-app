@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { prompts, promptResponses, sessions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { isTeacher } from "@/lib/auth";
+import { isTeacher, requireTeacher } from "@/lib/auth";
 
-// 回答一覧（教員: 常に取得可、学生: is_results_visible=true のときのみ）
+// 回答一覧（教員: 常に取得可、学生: discussionOpen=false のときのみ）
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -14,16 +14,19 @@ export async function GET(
   const teacher = await isTeacher();
 
   if (!teacher) {
-    const [prompt] = await db
-      .select({ isResultsVisible: prompts.isResultsVisible })
+    // プロンプトの存在確認 + 所属セッションの discussionOpen を取得
+    const [row] = await db
+      .select({ discussionOpen: sessions.discussionOpen })
       .from(prompts)
+      .innerJoin(sessions, eq(sessions.id, prompts.sessionId))
       .where(and(eq(prompts.id, promptId), eq(prompts.isDeleted, false)));
 
-    if (!prompt) {
+    if (!row) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    if (!prompt.isResultsVisible) {
-      return NextResponse.json({ error: "結果はまだ公開されていません" }, { status: 403 });
+    if (row.discussionOpen) {
+      // 受付中は他者回答を閲覧不可
+      return NextResponse.json({ error: "回答受付中は他者の回答を閲覧できません" }, { status: 403 });
     }
   }
 
@@ -94,4 +97,25 @@ export async function POST(
     .returning();
 
   return NextResponse.json(response, { status: 201 });
+}
+
+// この問題の全回答を削除（教員のみ・物理削除）
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    await requireTeacher();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { count } = await db
+    .delete(promptResponses)
+    .where(eq(promptResponses.promptId, parseInt(id)))
+    .returning({ count: promptResponses.id })
+    .then((rows) => ({ count: rows.length }));
+
+  return NextResponse.json({ ok: true, deleted: count });
 }

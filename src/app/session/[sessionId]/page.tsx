@@ -7,7 +7,6 @@ import { getClientId } from "@/lib/client-id";
 interface PromptItem {
   id: number;
   content: string;
-  isResultsVisible: boolean;
   responseCount: number;
   myAnswer: string | null;
 }
@@ -136,13 +135,12 @@ export default function SessionPage() {
     }
   };
 
-  // === 全問回答一覧 ===
+  // === 全問回答一覧（締切後のみ呼ばれる） ===
   const loadOverview = async () => {
     setOverviewLoading(true);
-    const visiblePrompts = promptList.filter((p) => p.isResultsVisible);
     try {
       const results = await Promise.all(
-        visiblePrompts.map(async (p) => {
+        promptList.map(async (p) => {
           const res = await fetch(`/api/prompts/${p.id}/responses`);
           const responses: PromptResponseItem[] = res.ok ? await res.json() : [];
           return { ...p, responses };
@@ -286,8 +284,8 @@ export default function SessionPage() {
           </div>
         )}
 
-        {/* 全問回答一覧ボタン */}
-        {promptList.some((p) => p.isResultsVisible) && (
+        {/* 全問回答一覧ボタン（締切後のみ表示） */}
+        {!session?.discussionOpen && promptList.length > 0 && (
           <button
             onClick={loadOverview}
             disabled={overviewLoading}
@@ -382,8 +380,8 @@ export default function SessionPage() {
                 );
               })()}
 
-              {/* 結果表示 */}
-              {p.isResultsVisible ? (
+              {/* 結果表示（締切後のみ） */}
+              {!session?.discussionOpen ? (
                 <div className="border-t pt-2">
                   <button
                     onClick={() => viewResults(p.id)}
@@ -412,7 +410,7 @@ export default function SessionPage() {
                 </div>
               ) : (
                 <p className="text-xs text-gray-400 border-t pt-2">
-                  結果は教員が公開するまで見られません
+                  回答受付中は他者の回答は表示されません
                 </p>
               )}
             </div>

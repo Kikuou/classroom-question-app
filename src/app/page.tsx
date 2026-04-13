@@ -82,6 +82,12 @@ function HomePageInner() {
     loadData(true);
   }, [loadData]);
 
+  // 30秒ポーリング（ディスカッション再開 / 締切の即時反映）
+  useEffect(() => {
+    const timer = setInterval(() => loadData(), 30000);
+    return () => clearInterval(timer);
+  }, [loadData]);
+
   // タブ復帰・bfcache復元時に最新データを再取得
   // （教員が削除・非公開にした内容を即時反映するため）
   useEffect(() => {

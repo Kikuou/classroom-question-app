@@ -39,8 +39,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json();
-  const updateData: Partial<{ name: string; isVisible: boolean }> = {};
+  const updateData: Partial<{ name: string; isVisible: boolean; questionsOpen: boolean }> = {};
   if (typeof body.isVisible === "boolean") updateData.isVisible = body.isVisible;
+  if (typeof body.questionsOpen === "boolean") updateData.questionsOpen = body.questionsOpen;
   if (typeof body.name === "string" && body.name.trim()) updateData.name = body.name.trim();
 
   if (Object.keys(updateData).length === 0) {

@@ -19,6 +19,7 @@ export const courses = pgTable("courses", {
   code: text("code").notNull().unique(),
   password: text("password").notNull(),
   isVisible: boolean("is_visible").default(true).notNull(),
+  questionsOpen: boolean("questions_open").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -76,7 +76,6 @@ export async function GET(_req: Request) {
         id: prompts.id,
         sessionId: prompts.sessionId,
         content: prompts.content,
-        isResultsVisible: prompts.isResultsVisible,
         sortOrder: prompts.sortOrder,
       })
       .from(prompts)
@@ -110,7 +109,7 @@ export async function GET(_req: Request) {
       });
 
     // ── アーカイブ
-    //    discussionOpen=false かつ isResultsVisible=true のプロンプトが1件以上あるセッション
+    //    discussionOpen=false かつ 非削除プロンプトが1件以上あるセッション
     //    授業ごとにグループ化（sortOrder ASC 順は allSessions 取得時に保証済み）
     type ArchiveCourse = {
       courseId: number;
@@ -128,8 +127,8 @@ export async function GET(_req: Request) {
       .filter((s) => !s.discussionOpen)
       .forEach((s) => {
         const sPrompts = promptsBySession.get(s.id) ?? [];
-        const visibleCount = sPrompts.filter((p) => p.isResultsVisible).length;
-        if (visibleCount === 0) return;
+        // 締切後は問題が1件以上あればアーカイブに表示（isResultsVisible は参照しない）
+        if (sPrompts.length === 0) return;
 
         if (!archivedMap.has(s.courseId)) {
           archivedMap.set(s.courseId, {
@@ -142,7 +141,7 @@ export async function GET(_req: Request) {
           sessionId: s.id,
           sessionTitle: s.title,
           sortOrder: s.sortOrder,
-          promptCount: visibleCount,
+          promptCount: sPrompts.length,
         });
       });
 
