@@ -88,7 +88,7 @@ export async function POST(req: Request) {
   try {
     const [course] = await db
       .insert(courses)
-      .values({ name: name.trim(), code, password: "-" })
+      .values({ name: name.trim(), code, password: "-", isVisible: true, questionsOpen: true })
       .returning();
     return NextResponse.json({ ...course, pendingCount: 0, sessions: [] }, { status: 201 });
   } catch (e) {

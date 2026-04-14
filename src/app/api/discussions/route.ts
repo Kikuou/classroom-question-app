@@ -94,7 +94,7 @@ export async function GET(_req: Request) {
         active: [],
         questionCourses: questionCoursesWithCounts,
         archived: [],
-        courses: visibleCourses,
+        courses: questionCoursesWithCounts,
       }, { headers: NO_CACHE });
     }
 
@@ -177,18 +177,11 @@ export async function GET(_req: Request) {
 
     const archived = Array.from(archivedMap.values());
 
-    // 「授業一覧」セクション用:
-    // 非削除セッションが1件以上ある授業のみ表示する
-    const courseIdsWithSessions = new Set(allSessions.map((s) => s.courseId));
-    const filteredCourses = visibleCourses.filter((c) =>
-      courseIdsWithSessions.has(c.id)
-    );
-
     return NextResponse.json({
       active,
       questionCourses: questionCoursesWithCounts,
       archived,
-      courses: filteredCourses,
+      courses: questionCoursesWithCounts,
     }, { headers: NO_CACHE });
   } catch (e) {
     console.error("[GET /api/discussions]", e);
