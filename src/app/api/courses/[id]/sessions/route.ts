@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, courses } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
@@ -26,7 +26,14 @@ export async function GET(
   const sessionList = await db
     .select({ id: sessions.id, title: sessions.title, isOpen: sessions.isOpen, sortOrder: sessions.sortOrder })
     .from(sessions)
-    .where(and(eq(sessions.courseId, courseId), eq(sessions.isDeleted, false)))
+    .where(
+      and(
+        eq(sessions.courseId, courseId),
+        eq(sessions.isDeleted, false),
+        eq(sessions.isVisible, true),
+        or(isNull(sessions.publishAt), sql`${sessions.publishAt} <= now()`)
+      )
+    )
     .orderBy(sessions.sortOrder, sessions.createdAt);
 
   return NextResponse.json(sessionList, { headers: NO_CACHE });

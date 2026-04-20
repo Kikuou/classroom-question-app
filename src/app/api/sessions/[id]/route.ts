@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, courses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { requireTeacher } from "@/lib/auth";
+import { requireTeacher, isTeacher } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
@@ -15,6 +15,7 @@ export async function GET(
   const { id } = await params;
   const sessionId = parseInt(id);
   try {
+    const teacher = await isTeacher();
     const [session] = await db
       .select({
         id: sessions.id,
@@ -25,12 +26,17 @@ export async function GET(
         courseName: courses.name,
         courseCode: courses.code,
         promptDescription: sessions.promptDescription,
+        isVisible: sessions.isVisible,
+        publishAt: sessions.publishAt,
         createdAt: sessions.createdAt,
       })
       .from(sessions)
       .innerJoin(courses, eq(sessions.courseId, courses.id))
       .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
     if (!session) return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_CACHE });
+    if (!teacher && (!session.isVisible || (session.publishAt && new Date(session.publishAt) > new Date()))) {
+      return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_CACHE });
+    }
     return NextResponse.json(session, { headers: NO_CACHE });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -56,6 +62,8 @@ export async function PATCH(
     discussionOpen: boolean;
     title: string;
     promptDescription: string | null;
+    isVisible: boolean;
+    publishAt: Date | null;
   }> = {};
 
   if (typeof body.isOpen === "boolean") updateData.isOpen = body.isOpen;
@@ -66,6 +74,10 @@ export async function PATCH(
       typeof body.promptDescription === "string" && body.promptDescription.trim()
         ? body.promptDescription.trim()
         : null;
+  }
+  if (typeof body.isVisible === "boolean") updateData.isVisible = body.isVisible;
+  if ("publishAt" in body) {
+    updateData.publishAt = body.publishAt ? new Date(body.publishAt) : null;
   }
 
   const [session] = await db

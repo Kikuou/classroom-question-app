@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   }
   const [session] = await db
     .insert(sessions)
-    .values({ courseId, title: title.trim() })
+    .values({ courseId, title: title.trim(), isVisible: false })
     .returning();
   return NextResponse.json(session, { status: 201 });
 }

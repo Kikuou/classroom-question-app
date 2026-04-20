@@ -26,6 +26,8 @@ interface SessionInfo {
   courseName: string;
   courseId: number;
   promptDescription: string | null;
+  isVisible: boolean;
+  publishAt: string | null;
 }
 
 const POLL_INTERVAL = 3000;
@@ -206,6 +208,21 @@ export default function TeacherSessionPage() {
     }
   };
 
+  // === 公開状態 ===
+  const [publishing, setPublishing] = useState(false);
+
+  const toggleVisible = async () => {
+    if (!session) return;
+    setPublishing(true);
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isVisible: !session.isVisible, publishAt: null }),
+    });
+    if (res.ok) setSession((s) => s ? { ...s, isVisible: !s.isVisible, publishAt: null } : s);
+    setPublishing(false);
+  };
+
   // === セッション複製 ===
   const [duplicating, setDuplicating] = useState(false);
   const duplicateSession = async () => {
@@ -357,6 +374,19 @@ export default function TeacherSessionPage() {
                 }`}
               >
                 {session?.discussionOpen ? "回答受付中 →締切" : "回答締切中 →再開"}
+              </button>
+              <button
+                onClick={toggleVisible}
+                disabled={publishing}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  session?.isVisible && (!session.publishAt || new Date(session.publishAt) <= new Date())
+                    ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
+                } disabled:opacity-50`}
+              >
+                {session?.isVisible && (!session.publishAt || new Date(session.publishAt) <= new Date())
+                  ? "学生に公開中"
+                  : "学生に非公開"}
               </button>
               <button
                 onClick={duplicateSession}

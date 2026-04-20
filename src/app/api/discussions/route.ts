@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { courses, sessions, prompts, questions } from "@/db/schema";
-import { eq, and, inArray, asc, ne, sql } from "drizzle-orm";
+import { eq, and, inArray, asc, ne, sql, or, isNull } from "drizzle-orm";
 
 // Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
 export const dynamic = "force-dynamic";
@@ -73,7 +73,9 @@ export async function GET(_req: Request) {
         and(
           eq(sessions.isDeleted, false),
           ne(sessions.isDeleted, true),          // 二重フィルタ（念のため）
-          inArray(sessions.courseId, courseIds)
+          inArray(sessions.courseId, courseIds),
+          eq(sessions.isVisible, true),
+          or(isNull(sessions.publishAt), sql`${sessions.publishAt} <= now()`)
         )
       )
       .orderBy(asc(sessions.sortOrder), asc(sessions.createdAt));

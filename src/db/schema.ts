@@ -34,6 +34,8 @@ export const sessions = pgTable("sessions", {
   sortOrder: integer("sort_order").default(0).notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
   promptDescription: text("prompt_description"),
+  isVisible: boolean("is_visible").default(true).notNull(),
+  publishAt: timestamp("publish_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
