@@ -359,25 +359,6 @@ function DiscussionTab({
         </section>
       )}
 
-      {/* 授業ごとに見る */}
-      {data.courses.length > 0 && (
-        <section>
-          <SectionHeading>授業ごとに見る</SectionHeading>
-          <ul className="space-y-1.5">
-            {data.courses.map((c) => (
-              <li key={c.id}>
-                <button
-                  onClick={() => router.push(`/courses/${c.id}?tab=sessions`)}
-                  className={`w-full text-left px-4 py-2.5 bg-white rounded-lg border border-gray-200 border-l-4 ${courseAccentColor(c.id)} hover:bg-indigo-50 transition-colors shadow-sm`}
-                >
-                  <p className="text-sm text-gray-700">{c.name}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {/* どちらも0件 */}
       {!hasActive && !hasArchived && (
         <div className="text-center py-10">

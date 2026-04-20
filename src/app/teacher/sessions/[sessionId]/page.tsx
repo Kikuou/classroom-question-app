@@ -210,6 +210,20 @@ export default function TeacherSessionPage() {
 
   // === 公開状態 ===
   const [publishing, setPublishing] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleInput, setScheduleInput] = useState("");
+
+  const setSessionSchedule = async (publishAt: string | null) => {
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isVisible: true, publishAt }),
+    });
+    if (res.ok) {
+      setSession((s) => s ? { ...s, isVisible: true, publishAt } : s);
+      setShowSchedule(false);
+    }
+  };
 
   const toggleVisible = async () => {
     if (!session) return;
@@ -381,13 +395,52 @@ export default function TeacherSessionPage() {
                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                   session?.isVisible && (!session.publishAt || new Date(session.publishAt) <= new Date())
                     ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    : session?.isVisible && session.publishAt && new Date(session.publishAt) > new Date()
+                    ? "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
                     : "border-gray-200 text-gray-400 bg-gray-50 hover:bg-gray-100"
                 } disabled:opacity-50`}
               >
                 {session?.isVisible && (!session.publishAt || new Date(session.publishAt) <= new Date())
                   ? "学生に公開中"
+                  : session?.isVisible && session.publishAt && new Date(session.publishAt) > new Date()
+                  ? `公開予定: ${formatSessionSchedule(session.publishAt)}`
                   : "学生に非公開"}
               </button>
+              {/* 公開スケジュール設定（非公開または予定中のとき） */}
+              {session && !(session.isVisible && (!session.publishAt || new Date(session.publishAt) <= new Date())) && (
+                <>
+                  {!showSchedule ? (
+                    <button
+                      onClick={() => { setShowSchedule(true); setScheduleInput(session.publishAt ? toLocalInputSession(session.publishAt) : ""); }}
+                      className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
+                    >
+                      🕐 {session.publishAt && new Date(session.publishAt) > new Date() ? "スケジュールを変更" : "公開予定を設定"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      <input
+                        type="datetime-local"
+                        value={scheduleInput}
+                        onChange={(e) => setScheduleInput(e.target.value)}
+                        className="text-xs border border-gray-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                      />
+                      <button
+                        onClick={() => setSessionSchedule(scheduleInput ? new Date(scheduleInput).toISOString() : null)}
+                        disabled={!scheduleInput}
+                        className="text-xs px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40"
+                      >
+                        設定
+                      </button>
+                      {session.publishAt && (
+                        <button onClick={() => setSessionSchedule(null)} className="text-xs text-red-400 hover:text-red-600">
+                          解除
+                        </button>
+                      )}
+                      <button onClick={() => setShowSchedule(false)} className="text-xs text-gray-400">閉じる</button>
+                    </div>
+                  )}
+                </>
+              )}
               <button
                 onClick={duplicateSession}
                 disabled={!session || duplicating}
@@ -633,4 +686,15 @@ export default function TeacherSessionPage() {
       </div>
     </main>
   );
+}
+
+function formatSessionSchedule(iso: string) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function toLocalInputSession(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

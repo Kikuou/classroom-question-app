@@ -218,24 +218,6 @@ export default function TeacherDashboardPage() {
     }
   };
 
-  // セッション公開スケジュール設定
-  const setSessionSchedule = async (courseId: number, sessionId: number, publishAt: string | null) => {
-    const res = await fetch(`/api/sessions/${sessionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isVisible: true, publishAt }),
-    });
-    if (res.ok) {
-      setCourses((prev) =>
-        prev.map((c) =>
-          c.id === courseId
-            ? { ...c, sessions: c.sessions.map((s) => s.id === sessionId ? { ...s, isVisible: true, publishAt } : s) }
-            : c
-        )
-      );
-    }
-  };
-
   // グローバルセッション作成フォームを開く
   const openGlobalForm = () => {
     setGlobalCourseId(courses.length === 1 ? courses[0].id : "");
@@ -400,7 +382,6 @@ export default function TeacherDashboardPage() {
               onToggleDiscussion={(sId, cur) => toggleDiscussion(c.id, sId, cur)}
               onManageQuestions={() => router.push(`/teacher/courses/${c.id}/questions`)}
               onToggleSessionVisible={(sId, cur) => toggleSessionVisible(c.id, sId, cur)}
-              onSetSessionSchedule={(sId, at) => setSessionSchedule(c.id, sId, at)}
             />
           ))
         )}
@@ -426,12 +407,6 @@ function formatSchedule(publishAt: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 // ─── 授業カード ─────────────────────────────────────────────────
 
 function CourseCard({
@@ -448,7 +423,6 @@ function CourseCard({
   onToggleDiscussion,
   onManageQuestions,
   onToggleSessionVisible,
-  onSetSessionSchedule,
 }: {
   course: CourseItem;
   onRename: (name: string) => void;
@@ -463,7 +437,6 @@ function CourseCard({
   onToggleDiscussion: (sessionId: number, current: boolean) => void;
   onManageQuestions: () => void;
   onToggleSessionVisible: (sessionId: number, current: boolean) => void;
-  onSetSessionSchedule: (sessionId: number, publishAt: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -542,7 +515,6 @@ function CourseCard({
                   onDelete={() => onDeleteSession(s.id)}
                   onToggleDiscussion={() => onToggleDiscussion(s.id, s.discussionOpen)}
                   onToggleVisible={() => onToggleSessionVisible(s.id, s.isVisible)}
-                  onSetSchedule={(at) => onSetSessionSchedule(s.id, at)}
                 />
               ))}
             </ul>
@@ -603,7 +575,6 @@ function SessionRow({
   onDelete,
   onToggleDiscussion,
   onToggleVisible,
-  onSetSchedule,
 }: {
   session: SessionItem;
   onRename: (title: string) => void;
@@ -611,11 +582,7 @@ function SessionRow({
   onDelete: () => void;
   onToggleDiscussion: () => void;
   onToggleVisible: () => void;
-  onSetSchedule: (publishAt: string | null) => void;
 }) {
-  const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleInput, setScheduleInput] = useState("");
-
   return (
     <li className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 group">
       <div className="flex-1 min-w-0 space-y-1">
@@ -655,44 +622,7 @@ function SessionRow({
               ? `公開予定: ${formatSchedule(session.publishAt)}`
               : "非公開"}
           </button>
-          {/* スケジュール設定ボタン */}
-          {!isEffectivelyVisible(session) && (
-            <button
-              onClick={() => { setShowSchedule((v) => !v); setScheduleInput(session.publishAt ? toLocalInput(session.publishAt) : ""); }}
-              className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
-              title="公開スケジュールを設定"
-            >
-              🕐
-            </button>
-          )}
         </div>
-        {/* スケジュール入力フォーム */}
-        {showSchedule && (
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              type="datetime-local"
-              value={scheduleInput}
-              onChange={(e) => setScheduleInput(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-            />
-            <button
-              onClick={() => { onSetSchedule(scheduleInput ? new Date(scheduleInput).toISOString() : null); setShowSchedule(false); }}
-              disabled={!scheduleInput}
-              className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40"
-            >
-              設定
-            </button>
-            {session.publishAt && (
-              <button
-                onClick={() => { onSetSchedule(null); setShowSchedule(false); }}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                解除
-              </button>
-            )}
-            <button onClick={() => setShowSchedule(false)} className="text-xs text-gray-400 hover:text-gray-600">閉じる</button>
-          </div>
-        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <button
