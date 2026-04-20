@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { likes, questions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { isRateLimited } from "@/lib/rate-limit";
 
 // いいね追加
 export async function POST(
@@ -13,6 +14,10 @@ export async function POST(
   const { clientId } = await req.json();
   if (!clientId) {
     return NextResponse.json({ error: "clientIdは必須です" }, { status: 400 });
+  }
+  // レートリミット: 1分間に30件まで
+  if (isRateLimited(`like:${clientId}`, 30, 60_000)) {
+    return NextResponse.json({ error: "操作が多すぎます" }, { status: 429 });
   }
 
   // questionのsessionIdを取得

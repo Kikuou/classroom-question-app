@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { questions, likes, replies, sessions, courses } from "@/db/schema";
 import { eq, and, ne, or, sql, desc, asc, inArray, isNull } from "drizzle-orm";
 import { isTeacher } from "@/lib/auth";
+import { isRateLimited } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
@@ -143,6 +144,16 @@ export async function POST(
   const { content, authorName, clientId } = await req.json();
   if (!content?.trim() || !clientId) {
     return NextResponse.json({ error: "質問内容とclientIdは必須です" }, { status: 400, headers: NO_CACHE });
+  }
+  if (content.trim().length > 500) {
+    return NextResponse.json({ error: "質問は500文字以内で入力してください" }, { status: 400, headers: NO_CACHE });
+  }
+  if (authorName && authorName.trim().length > 50) {
+    return NextResponse.json({ error: "名前は50文字以内で入力してください" }, { status: 400, headers: NO_CACHE });
+  }
+  // レートリミット: 1分間に5件まで
+  if (isRateLimited(`question:${clientId}`, 5, 60_000)) {
+    return NextResponse.json({ error: "送信が多すぎます。しばらく待ってから再試行してください" }, { status: 429, headers: NO_CACHE });
   }
 
   const [question] = await db

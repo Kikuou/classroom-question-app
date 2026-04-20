@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { questions, replies, likes, sessions } from "@/db/schema";
 import { eq, sql, and, ne, inArray } from "drizzle-orm";
 import { isTeacher } from "@/lib/auth";
+import { isRateLimited } from "@/lib/rate-limit";
 
 // 質問一覧（いいね数・返信含む）
 export async function GET(
@@ -111,6 +112,16 @@ export async function POST(
   const { content, authorName, clientId } = await req.json();
   if (!content?.trim() || !clientId) {
     return NextResponse.json({ error: "質問内容とclientIdは必須です" }, { status: 400 });
+  }
+  if (content.trim().length > 500) {
+    return NextResponse.json({ error: "質問は500文字以内で入力してください" }, { status: 400 });
+  }
+  if (authorName && authorName.trim().length > 50) {
+    return NextResponse.json({ error: "名前は50文字以内で入力してください" }, { status: 400 });
+  }
+  // レートリミット: 1分間に5件まで
+  if (isRateLimited(`question:${clientId}`, 5, 60_000)) {
+    return NextResponse.json({ error: "送信が多すぎます。しばらく待ってから再試行してください" }, { status: 429 });
   }
 
   const [question] = await db

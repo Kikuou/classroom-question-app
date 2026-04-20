@@ -1,15 +1,22 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.TEACHER_SECRET ?? "dev-secret-change-in-production"
-);
+function getSecret(): Uint8Array {
+  const secret = process.env.TEACHER_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("TEACHER_SECRET 環境変数が設定されていません。Render の Environment Variables に設定してください。");
+    }
+    return new TextEncoder().encode("dev-secret-change-in-production");
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export async function createTeacherToken(): Promise<string> {
   return new SignJWT({ teacher: true })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("24h")
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 export async function isTeacher(): Promise<boolean> {
@@ -17,7 +24,7 @@ export async function isTeacher(): Promise<boolean> {
   const token = cookieStore.get("teacher_token")?.value;
   if (!token) return false;
   try {
-    await jwtVerify(token, SECRET);
+    await jwtVerify(token, getSecret());
     return true;
   } catch {
     return false;

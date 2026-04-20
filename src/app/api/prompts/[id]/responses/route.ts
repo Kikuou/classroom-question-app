@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { prompts, promptResponses, sessions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { isTeacher, requireTeacher } from "@/lib/auth";
+import { isRateLimited } from "@/lib/rate-limit";
 
 // 回答一覧（教員: 常に取得可、学生: discussionOpen=false のときのみ）
 export async function GET(
@@ -57,6 +58,13 @@ export async function POST(
   }
   if (!clientId) {
     return NextResponse.json({ error: "clientId is required" }, { status: 400 });
+  }
+  if (answer.trim().length > 1000) {
+    return NextResponse.json({ error: "回答は1000文字以内で入力してください" }, { status: 400 });
+  }
+  // レートリミット: 1分間に10件まで（upsertなので多めに許容）
+  if (isRateLimited(`response:${clientId}`, 10, 60_000)) {
+    return NextResponse.json({ error: "送信が多すぎます。しばらく待ってから再試行してください" }, { status: 429 });
   }
 
   // プロンプトが存在し、削除されていないことを確認
