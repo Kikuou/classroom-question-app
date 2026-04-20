@@ -46,7 +46,7 @@ type Mode = "questions" | "discussion";
 function HomePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const mode: Mode = (searchParams.get("mode") as Mode) ?? "questions";
+  const mode: Mode = (searchParams.get("mode") as Mode) ?? "discussion";
 
   const [data, setData] = useState<DiscussionsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,16 +134,6 @@ function HomePageInner() {
         <div className="max-w-lg mx-auto px-4 pt-3 pb-3">
           <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
             <button
-              onClick={() => setMode("questions")}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                mode === "questions"
-                  ? "bg-white text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              📝 質問
-            </button>
-            <button
               onClick={() => setMode("discussion")}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
                 mode === "discussion"
@@ -152,6 +142,16 @@ function HomePageInner() {
               }`}
             >
               💬 ディスカッション
+            </button>
+            <button
+              onClick={() => setMode("questions")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === "questions"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              📝 質問
             </button>
           </div>
         </div>
