@@ -50,6 +50,8 @@ export async function GET() {
       discussionOpen: sessions.discussionOpen,
       sortOrder: sessions.sortOrder,
       createdAt: sessions.createdAt,
+      isVisible: sessions.isVisible,
+      publishAt: sessions.publishAt,
     })
     .from(sessions)
     .where(and(eq(sessions.isDeleted, false), inArray(sessions.courseId, courseIds)))

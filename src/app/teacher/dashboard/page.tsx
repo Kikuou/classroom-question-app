@@ -605,23 +605,35 @@ function SessionRow({
           >
             回答{session.discussionOpen ? "受付中" : "締切"}
           </button>
-          {/* 公開状態バッジ（クリックでトグル） */}
-          <button
-            onClick={onToggleVisible}
-            className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-colors ${
-              isEffectivelyVisible(session)
-                ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200"
-                : session.publishAt && !isPublishPast(session.publishAt)
-                ? "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
-                : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
-            }`}
-          >
-            {isEffectivelyVisible(session)
-              ? "公開中"
-              : session.publishAt && !isPublishPast(session.publishAt)
-              ? `公開予定: ${formatSchedule(session.publishAt)}`
-              : "非公開"}
-          </button>
+          {/* 公開状態バッジ */}
+          {/* 公開予定状態のときはクリックでセッション管理ページへ（スケジュール誤消去防止） */}
+          {/* 公開中・非公開のときはクリックでトグル */}
+          {(() => {
+            const isScheduled = !isEffectivelyVisible(session) && !!session.publishAt && !isPublishPast(session.publishAt);
+            return (
+              <button
+                onClick={() => isScheduled ? onManage() : onToggleVisible()}
+                title={
+                  isScheduled
+                    ? "クリックでスケジュールを変更する"
+                    : isEffectivelyVisible(session) ? "クリックで非公開にする" : "クリックで公開する"
+                }
+                className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-colors ${
+                  isEffectivelyVisible(session)
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200"
+                    : isScheduled
+                    ? "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
+                    : "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
+                }`}
+              >
+                {isEffectivelyVisible(session)
+                  ? "公開中"
+                  : isScheduled
+                  ? `🕐 ${formatSchedule(session.publishAt!)}`
+                  : "非公開"}
+              </button>
+            );
+          })()}
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">

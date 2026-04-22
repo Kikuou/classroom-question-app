@@ -213,14 +213,17 @@ export default function TeacherSessionPage() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleInput, setScheduleInput] = useState("");
 
+  // 公開スケジュールを設定（publishAt は ISO 文字列 or null）
+  // null のとき → スケジュールを解除して「非公開」に戻す（即公開ではない）
   const setSessionSchedule = async (publishAt: string | null) => {
+    const isVisible = publishAt !== null; // 日時設定 → isVisible=true、解除 → false
     const res = await fetch(`/api/sessions/${sessionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isVisible: true, publishAt }),
+      body: JSON.stringify({ isVisible, publishAt }),
     });
     if (res.ok) {
-      setSession((s) => s ? { ...s, isVisible: true, publishAt } : s);
+      setSession((s) => s ? { ...s, isVisible, publishAt } : s);
       setShowSchedule(false);
     }
   };
@@ -364,14 +367,10 @@ export default function TeacherSessionPage() {
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
               <button
-                onClick={() =>
-                  session
-                    ? router.push(`/teacher/courses/${session.courseId}`)
-                    : router.push("/teacher/dashboard")
-                }
+                onClick={() => router.push("/teacher/dashboard")}
                 className="text-xs text-gray-400 hover:text-gray-600 mb-0.5 block"
               >
-                ← {session ? "授業一覧" : "ダッシュボード"}
+                ← ダッシュボード
               </button>
               <h1 className="font-bold text-gray-800 text-sm">
                 {sessionLoading ? "読み込み中..." : sessionError ? "エラー" : (session?.title ?? "")}
@@ -432,8 +431,8 @@ export default function TeacherSessionPage() {
                         設定
                       </button>
                       {session.publishAt && (
-                        <button onClick={() => setSessionSchedule(null)} className="text-xs text-red-400 hover:text-red-600">
-                          解除
+                        <button onClick={() => setSessionSchedule(null)} className="text-xs text-red-400 hover:text-red-600" title="スケジュールを解除して非公開に戻す">
+                          解除（非公開に戻す）
                         </button>
                       )}
                       <button onClick={() => setShowSchedule(false)} className="text-xs text-gray-400">閉じる</button>
