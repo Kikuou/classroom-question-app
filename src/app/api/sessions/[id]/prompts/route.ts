@@ -15,12 +15,21 @@ export async function GET(
   const url = new URL(req.url);
   const clientId = url.searchParams.get("clientId");
 
-  // 削除済みセッションは空配列を返す（防御的チェック）
+  // セッションの存在・公開状態チェック
   const [sessionRow] = await db
-    .select({ id: sessions.id })
+    .select({ id: sessions.id, isVisible: sessions.isVisible, publishAt: sessions.publishAt })
     .from(sessions)
     .where(and(eq(sessions.id, sessionId), eq(sessions.isDeleted, false)));
+
   if (!sessionRow) return NextResponse.json([]);
+
+  // 学生はスケジュール公開前のセッションのプロンプトを取得できない
+  if (!teacher) {
+    const isScheduledFuture = sessionRow.publishAt && new Date(sessionRow.publishAt) > new Date();
+    if (!sessionRow.isVisible || isScheduledFuture) {
+      return NextResponse.json([], { status: 403 });
+    }
+  }
 
   const conditions = teacher
     ? [eq(prompts.sessionId, sessionId)]
