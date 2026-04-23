@@ -360,7 +360,7 @@ function DiscussionTab({
                               {s.sessionTitle}
                             </span>
                             <span className="text-xs text-gray-400 shrink-0">
-                              （{s.promptCount}問）
+                              {s.promptCount > 0 ? `（${s.promptCount}問）` : "（準備中）"}
                             </span>
                           </div>
                           <button

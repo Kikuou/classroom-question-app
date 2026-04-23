@@ -138,7 +138,8 @@ export async function GET(_req: Request) {
       });
 
     // ── アーカイブ
-    //    discussionOpen=false かつ 非削除プロンプトが1件以上あるセッション
+    //    discussionOpen=false（回答締切）のセッション
+    //    プロンプト0件でも含める: 公開中セッションは必ず学生に見える
     //    授業ごとにグループ化（sortOrder ASC 順は allSessions 取得時に保証済み）
     type ArchiveCourse = {
       courseId: number;
@@ -156,8 +157,6 @@ export async function GET(_req: Request) {
       .filter((s) => !s.discussionOpen)
       .forEach((s) => {
         const sPrompts = promptsBySession.get(s.id) ?? [];
-        // 締切後は問題が1件以上あればアーカイブに表示（isResultsVisible は参照しない）
-        if (sPrompts.length === 0) return;
 
         if (!archivedMap.has(s.courseId)) {
           archivedMap.set(s.courseId, {
