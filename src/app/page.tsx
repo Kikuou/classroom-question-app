@@ -78,10 +78,15 @@ function HomePageInner() {
       };
       setData(d);
       setError(""); // 成功時のみエラーをクリア
-      if (initial) {
-        // 初回のみ全授業を展開
-        setExpandedArchive(new Set(d.archived.map((a) => a.courseId)));
-      }
+      // アーカイブに新しい授業が追加されたときだけ展開状態に追加
+      // 既に折りたたんだ授業は維持し、新規分だけ自動展開
+      setExpandedArchive((prev) => {
+        const next = new Set(prev);
+        d.archived.forEach((a) => {
+          if (!prev.has(a.courseId)) next.add(a.courseId);
+        });
+        return next;
+      });
     } catch {
       if (initial) setError("通信エラーが発生しました");
     } finally {
@@ -288,12 +293,20 @@ function DiscussionTab({
                     <p className="text-xs font-medium text-indigo-600">
                       {d.courseName}　／　{d.sessionTitle}
                     </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      🟢 回答受付中（{d.promptCount}問）
-                    </p>
-                    {d.firstPromptPreview && (
-                      <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
-                        「{d.firstPromptPreview}…」
+                    {d.promptCount > 0 ? (
+                      <>
+                        <p className="text-xs text-emerald-600 mt-1">
+                          🟢 回答受付中（{d.promptCount}問）
+                        </p>
+                        {d.firstPromptPreview && (
+                          <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
+                            「{d.firstPromptPreview}…」
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-amber-500 mt-1">
+                        ⏳ 準備中（しばらくお待ちください）
                       </p>
                     )}
                   </div>

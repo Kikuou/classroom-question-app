@@ -122,22 +122,19 @@ export async function GET(_req: Request) {
     });
 
     // ── 実施中ディスカッション
-    //    discussionOpen=true かつ 非削除プロンプトが1件以上あるセッション
+    //    discussionOpen=true のセッション（プロンプト0件でも表示: 教員が準備中の場合がある）
     const active = allSessions
       .filter((s) => s.discussionOpen)
-      .flatMap((s) => {
+      .map((s) => {
         const sPrompts = promptsBySession.get(s.id) ?? [];
-        if (sPrompts.length === 0) return [];
-        return [
-          {
-            sessionId: s.id,
-            sessionTitle: s.title,
-            courseId: s.courseId,
-            courseName: courseMap.get(s.courseId) ?? "",
-            promptCount: sPrompts.length,
-            firstPromptPreview: sPrompts[0].content.slice(0, 60),
-          },
-        ];
+        return {
+          sessionId: s.id,
+          sessionTitle: s.title,
+          courseId: s.courseId,
+          courseName: courseMap.get(s.courseId) ?? "",
+          promptCount: sPrompts.length,
+          firstPromptPreview: sPrompts[0]?.content.slice(0, 60) ?? "",
+        };
       });
 
     // ── アーカイブ
