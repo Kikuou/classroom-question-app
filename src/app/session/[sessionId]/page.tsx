@@ -200,7 +200,15 @@ export default function SessionPage() {
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500">セッションが見つかりません</p>
-          <a href="/" className="text-indigo-500 underline mt-2 block">トップに戻る</a>
+          <p className="text-gray-400 text-xs mt-1">このセッションは削除されたか非公開になっています</p>
+          {/* window.location.href でトップページを強制再読み込み
+              → Next.js Router Cache をバイパスし、必ず最新データを取得 */}
+          <button
+            onClick={() => { window.location.href = "/"; }}
+            className="text-indigo-500 underline mt-3 block text-sm mx-auto"
+          >
+            ← トップに戻る
+          </button>
         </div>
       </main>
     );

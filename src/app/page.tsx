@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface ActiveDiscussion {
@@ -53,23 +53,27 @@ function HomePageInner() {
   const [error, setError] = useState("");
   // アーカイブ折りたたみ状態
   const [expandedArchive, setExpandedArchive] = useState<Set<number>>(new Set());
+  // ポーリングタイマー ref（アンマウント時に確実にクリアするため）
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // タブ切替（URL を replace: ブラウザ履歴を汚さない）
   const setMode = (newMode: Mode) => {
     router.replace(`/?mode=${newMode}`, { scroll: false });
   };
 
-  // データ取得（初回 + 再表示時に共通で使う）
+  // データ取得（初回 + ポーリング共通）
+  // _t パラメータでブラウザ・CDN 両方のキャッシュを確実にバイパス
   const loadData = useCallback(async (initial: boolean = false) => {
     if (initial) { setLoading(true); setError(""); }
     try {
-      const res = await fetch("/api/discussions", { cache: "no-store" });
+      const res = await fetch(`/api/discussions?_t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) {
         if (initial) setError("読み込みに失敗しました");
+        // ポーリング失敗時も前回データを維持（setData は呼ばない）
         return;
       }
       const raw = await res.json();
-      // Fix #6: APIレスポンスの形状を実行時に検証（予期しない形状でのクラッシュ防止）
+      // APIレスポンスの形状を実行時に検証（予期しない形状でのクラッシュ防止）
       const d: DiscussionsData = {
         active: Array.isArray(raw?.active) ? raw.active : [],
         questionCourses: Array.isArray(raw?.questionCourses) ? raw.questionCourses : [],
@@ -94,33 +98,52 @@ function HomePageInner() {
     }
   }, []);
 
-  // 初回ロード
+  // ポーリング再起動ヘルパー（間隔変更時も確実に適用）
+  const restartPolling = useCallback(() => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    pollTimerRef.current = setInterval(() => loadData(), 10_000); // 10秒間隔
+  }, [loadData]);
+
+  // 初回ロード + ポーリング開始
   useEffect(() => {
     loadData(true);
-  }, [loadData]);
+    restartPolling();
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [loadData, restartPolling]);
 
-  // 30秒ポーリング（ディスカッション再開 / 締切の即時反映）
-  useEffect(() => {
-    const timer = setInterval(() => loadData(), 30000);
-    return () => clearInterval(timer);
-  }, [loadData]);
-
-  // タブ復帰・bfcache復元時に最新データを再取得
+  // タブ復帰・bfcache・Next.js Router Cache 復元時に最新データを再取得
   // （教員が削除・非公開にした内容を即時反映するため）
   useEffect(() => {
+    // visibilitychange: 他のタブから戻ってきたとき
     const handleVisible = () => {
-      if (document.visibilityState === "visible") loadData();
+      if (document.visibilityState === "visible") {
+        loadData();
+        restartPolling(); // ポーリングも再起動（タイマーがズレてリセット）
+      }
     };
+    // pageshow persisted: bfcache から復元されたとき
     const handlePageshow = (e: PageTransitionEvent) => {
-      if (e.persisted) loadData();
+      if (e.persisted) {
+        loadData(true);
+        restartPolling();
+      }
+    };
+    // popstate: ブラウザ戻る / 進む（Next.js クライアントナビゲーション含む）
+    const handlePopstate = () => {
+      loadData(true);
+      restartPolling();
     };
     document.addEventListener("visibilitychange", handleVisible);
     window.addEventListener("pageshow", handlePageshow as EventListener);
+    window.addEventListener("popstate", handlePopstate);
     return () => {
       document.removeEventListener("visibilitychange", handleVisible);
       window.removeEventListener("pageshow", handlePageshow as EventListener);
+      window.removeEventListener("popstate", handlePopstate);
     };
-  }, [loadData]);
+  }, [loadData, restartPolling]);
 
   const toggleArchive = (courseId: number) => {
     setExpandedArchive((prev) => {
