@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getClientId } from "@/lib/client-id";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LikeButton } from "@/components/LikeButton";
@@ -25,13 +25,6 @@ interface QuestionItem {
   replies: Reply[];
 }
 
-interface SessionItem {
-  id: number;
-  title: string;
-  isOpen: boolean;
-  sortOrder: number;
-}
-
 interface CourseInfo {
   id: number;
   name: string;
@@ -43,18 +36,12 @@ const POLL_INTERVAL = 5000;
 function CoursePageInner() {
   const { courseId } = useParams<{ courseId: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const [tab, setTab] = useState<"sessions" | "questions">(
-    tabParam === "questions" ? "questions" : "sessions"
-  );
 
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  // === 質問タブ state ===
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [sort, setSort] = useState<"time" | "likes">("time");
   const [content, setContent] = useState("");
@@ -65,20 +52,11 @@ function CoursePageInner() {
   const [questionsOpen, setQuestionsOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
-  // === セッションタブ state ===
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
-
   // === トースト通知 ===
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2500);
-  };
-
-  // タブ切替: URL に保持
-  const switchTab = (newTab: "sessions" | "questions") => {
-    setTab(newTab);
-    router.replace(`/courses/${courseId}?tab=${newTab}`, { scroll: false });
   };
 
   // 授業情報取得
@@ -123,50 +101,24 @@ function CoursePageInner() {
     }
   }, [courseId, sort]);
 
-  // セッション取得
-  const fetchSessions = useCallback(async () => {
-    const res = await fetch(`/api/courses/${courseId}/sessions`, { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      setSessions(Array.isArray(data) ? data : []);
-      setLoading(false);
-    } else if (res.status === 404) {
-      setNotFound(true);
-      setLoading(false);
-    } else {
-      setServerError("セッション一覧の取得に失敗しました");
-      setLoading(false);
-    }
-  }, [courseId]);
-
-  // タブ切替時のデータ取得
+  // データ取得 + ポーリング
   useEffect(() => {
     setLoading(true);
-    if (tab === "questions") {
-      fetchQuestions();
-      const timer = setInterval(fetchQuestions, POLL_INTERVAL);
-      return () => {
-        clearInterval(timer);
-        abortRef.current?.abort();
-      };
-    } else {
-      fetchSessions();
-    }
-  }, [tab, fetchQuestions, fetchSessions]);
+    fetchQuestions();
+    const timer = setInterval(fetchQuestions, POLL_INTERVAL);
+    return () => {
+      clearInterval(timer);
+      abortRef.current?.abort();
+    };
+  }, [fetchQuestions]);
 
   // タブ復帰時に再取得
   useEffect(() => {
     const handleVisible = () => {
-      if (document.visibilityState === "visible") {
-        if (tab === "questions") fetchQuestions();
-        else fetchSessions();
-      }
+      if (document.visibilityState === "visible") fetchQuestions();
     };
     const handlePageshow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        if (tab === "questions") fetchQuestions();
-        else fetchSessions();
-      }
+      if (e.persisted) fetchQuestions();
     };
     document.addEventListener("visibilitychange", handleVisible);
     window.addEventListener("pageshow", handlePageshow as EventListener);
@@ -174,7 +126,7 @@ function CoursePageInner() {
       document.removeEventListener("visibilitychange", handleVisible);
       window.removeEventListener("pageshow", handlePageshow as EventListener);
     };
-  }, [tab, fetchQuestions, fetchSessions]);
+  }, [fetchQuestions]);
 
   // 質問取り消し（自分の pending 質問のみ）
   const handleDeleteQuestion = async (questionId: number) => {
@@ -249,7 +201,7 @@ function CoursePageInner() {
   return (
     <main className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 pt-3 pb-0">
+        <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/")}
@@ -261,57 +213,12 @@ function CoursePageInner() {
               {course?.name ?? "読み込み中..."}
             </h1>
           </div>
-
-          {/* タブ（ディスカッション優先） */}
-          <div className="flex gap-6 border-b border-gray-200 mt-2">
-            <button
-              onClick={() => switchTab("sessions")}
-              className={`text-sm pb-2 font-medium border-b-2 transition-colors ${
-                tab === "sessions"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              💬 ディスカッション
-            </button>
-            <button
-              onClick={() => switchTab("questions")}
-              className={`text-sm pb-2 font-medium border-b-2 transition-colors ${
-                tab === "questions"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              📝 質問
-            </button>
-          </div>
         </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
         {loading ? (
           <div className="text-center text-gray-400 py-16 text-sm">読み込み中...</div>
-        ) : tab === "sessions" ? (
-          <>
-            {sessions.length === 0 ? (
-              <div className="text-center text-gray-400 py-12 text-sm">
-                まだディスカッションは開始されていません
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {sessions.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      onClick={() => router.push(`/session/${s.id}`)}
-                      className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50 transition-colors shadow-sm"
-                    >
-                      <span className="font-medium text-sm text-gray-800">{s.title}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
         ) : (
           <>
             {questionsOpen ? (
