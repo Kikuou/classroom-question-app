@@ -19,7 +19,7 @@ export default function NewSessionPage() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim() }),
+        body: JSON.stringify({ title: title.trim(), courseId: Number(courseId) }),
       });
       if (!res.ok) {
         if (res.status === 401) {

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     .values({
       courseId,
       title: title.trim(),
-      isVisible: false,
+      isVisible: true,
       discussionOpen: true,   // 明示: DBデフォルト任せにしない
       isOpen: true,
     })

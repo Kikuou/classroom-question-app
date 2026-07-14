@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
+import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/db";
 import { courses, sessions, prompts, questions } from "@/db/schema";
 import { eq, and, inArray, asc, ne, sql, or, isNull } from "drizzle-orm";
 
 // Next.js のルートキャッシュを完全無効化（削除・非公開の即時反映のため必須）
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 const NO_CACHE = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 
 // 学生用: トップページ向けに実施中・質問受付中・アーカイブを一括返却
 export async function GET(_req: Request) {
+  noStore();
   try {
     // 1. 公開中の授業
     const visibleCourses = await db
